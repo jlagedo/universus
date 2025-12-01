@@ -5,7 +5,8 @@ Unit tests for the API client layer.
 import pytest
 import time
 from unittest.mock import Mock, patch, MagicMock
-from api_client import RateLimiter, UniversalisAPI, DEFAULT_RATE_LIMIT
+from api_client import RateLimiter, UniversalisAPI
+from config import get_config
 import requests
 
 
@@ -21,7 +22,8 @@ class TestRateLimiter:
     def test_default_rate_limit(self):
         """Test default rate limit is applied."""
         limiter = RateLimiter()
-        assert limiter.min_interval == 0.5  # 1/2
+        # Default rate limit from config is 2.0 req/sec -> interval 0.5s
+        assert abs(limiter.min_interval - 0.5) < 1e-6
     
     def test_first_request_no_wait(self):
         """Test that first request doesn't wait."""

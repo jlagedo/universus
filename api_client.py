@@ -7,25 +7,25 @@ import logging
 from typing import Optional, Dict, Any
 import requests
 
+from config import get_config
+
 logger = logging.getLogger(__name__)
 
-
-# Constants
-MAX_ITEMS_PER_QUERY = 200
-DEFAULT_HISTORY_ENTRIES = 100
-DEFAULT_TIMEOUT = 10
-DEFAULT_RATE_LIMIT = 2.0  # requests per second
+# Load configuration
+config = get_config()
 
 
 class RateLimiter:
     """Rate limiter to respect API limits."""
     
-    def __init__(self, requests_per_second: float = DEFAULT_RATE_LIMIT):
+    def __init__(self, requests_per_second: float = None):
         """Initialize rate limiter.
         
         Conservative limit of 2 requests/second based on API implementation
         showing 100ms delays between requests.
         """
+        if requests_per_second is None:
+            requests_per_second = config.get('api', 'rate_limit', 2.0)
         self.min_interval = 1.0 / requests_per_second
         self.last_request_time = 0.0
         logger.debug(f"Rate limiter initialized: {requests_per_second} req/sec (interval: {self.min_interval:.3f}s)")
@@ -44,9 +44,10 @@ class RateLimiter:
 class UniversalisAPI:
     """Client for interacting with the Universalis API."""
     
-    BASE_URL = "https://universalis.app/api"
-    
-    def __init__(self, timeout: int = DEFAULT_TIMEOUT, rate_limiter: Optional[RateLimiter] = None):
+    def __init__(self, timeout: int = None, rate_limiter: Optional[RateLimiter] = None):
+        if timeout is None:
+            timeout = config.get('api', 'timeout', 10)
+        self.base_url = config.get('api', 'base_url', 'https://universalis.app/api')
         self.timeout = timeout
         self.rate_limiter = rate_limiter or RateLimiter()
         self.session = requests.Session()
@@ -89,16 +90,19 @@ class UniversalisAPI:
     def get_datacenters(self) -> list:
         """Fetch all available datacenters from the API."""
         logger.info("Fetching datacenters list")
-        result = self._make_request(f"{self.BASE_URL}/data-centers")
+        result = self._make_request(f"{self.base_url}/data-centers")
         logger.info(f"Retrieved {len(result)} datacenters")
         return result
     
-    def get_most_recently_updated(self, world: str, entries: int = MAX_ITEMS_PER_QUERY) -> Dict:
+    def get_most_recently_updated(self, world: str, entries: int = None) -> Dict:
         """Fetch most recently updated items for a world."""
+        if entries is None:
+            entries = config.get('api', 'max_items_per_query', 200)
+        max_items = config.get('api', 'max_items_per_query', 200)
         logger.info(f"Fetching most recently updated items for {world} (limit: {entries})")
         result = self._make_request(
-            f"{self.BASE_URL}/extra/stats/most-recently-updated",
-            params={"world": world, "entries": min(entries, MAX_ITEMS_PER_QUERY)}
+            f"{self.base_url}/extra/stats/most-recently-updated",
+            params={"world": world, "entries": min(entries, max_items)}
         )
         logger.info(f"Retrieved {len(result.get('items', []))} items")
         return result
@@ -106,13 +110,15 @@ class UniversalisAPI:
     def get_market_data(self, world: str, item_id: int) -> Dict:
         """Fetch current market data for an item on a world."""
         logger.debug(f"Fetching market data for item {item_id} on {world}")
-        return self._make_request(f"{self.BASE_URL}/{world}/{item_id}")
+        return self._make_request(f"{self.base_url}/{world}/{item_id}")
     
-    def get_history(self, world: str, item_id: int, entries: int = DEFAULT_HISTORY_ENTRIES) -> Dict:
+    def get_history(self, world: str, item_id: int, entries: int = None) -> Dict:
         """Fetch sales history for an item on a world."""
+        if entries is None:
+            entries = config.get('api', 'default_history_entries', 100)
         logger.debug(f"Fetching history for item {item_id} on {world} (limit: {entries})")
         return self._make_request(
-            f"{self.BASE_URL}/history/{world}/{item_id}",
+            f"{self.base_url}/history/{world}/{item_id}",
             params={"entries": entries}
         )
     
@@ -123,10 +129,11 @@ class UniversalisAPI:
             Dictionary mapping item_id (string) to item data with 'en' field
         """
         logger.info("Fetching items from FFXIV Teamcraft")
-        url = "https://raw.githubusercontent.com/ffxiv-teamcraft/ffxiv-teamcraft/master/libs/data/src/lib/json/items.json"
+        url = config.get('teamcraft', 'items_url', 'https://raw.githubusercontent.com/ffxiv-teamcraft/ffxiv-teamcraft/master/libs/data/src/lib/json/items.json')
+        timeout = config.get('teamcraft', 'timeout', 30)
         
         # Don't apply rate limiting for external API
-        response = self.session.get(url, timeout=30)  # Longer timeout for large file
+        response = self.session.get(url, timeout=timeout)
         response.raise_for_status()
         data = response.json()
         logger.info(f"Retrieved {len(data)} items from Teamcraft")

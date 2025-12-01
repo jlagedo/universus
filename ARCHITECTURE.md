@@ -16,6 +16,7 @@ Universus follows a **layered architecture** pattern with clear separation of co
 ├─────────────────────────────────────────┤
 │    API Client (api_client.py)            │  ← HTTP requests & rate limiting
 │    Database (database.py)                │  ← SQLite operations & queries
+│    Configuration (config.py)             │  ← Load settings from TOML
 └─────────────────────────────────────────┘
 ```
 
@@ -29,12 +30,14 @@ Universus follows a **layered architecture** pattern with clear separation of co
 - Parse command-line arguments
 - Initialize and coordinate other layers
 - Setup logging configuration
+ - Setup logging configuration (from `config.toml`)
 - Handle resource cleanup
 
 **Dependencies**: All other modules
 
 **Key Components**:
 - `cli()` - Main CLI group with configuration
+ - `--config-file` option to load custom TOML
 - `cleanup()` - Resource cleanup callback
 - Command functions: `datacenters`, `init_tracking`, `update`, `top`, `report`, `list_tracked`
 
@@ -73,7 +76,7 @@ Universus follows a **layered architecture** pattern with clear separation of co
 - Format data for presentation
 - Handle operation workflows
 
-**Dependencies**: `database.py`, `api_client.py`
+**Dependencies**: `database.py`, `api_client.py`, `config.py`
 
 **Key Components**:
 - `MarketService` - Main service class
@@ -107,7 +110,7 @@ format_time_ago(timestamp) → str
 - Implement CRUD operations
 - Manage transactions
 
-**Dependencies**: None (only sqlite3 stdlib)
+**Dependencies**: `config.py` for default DB path
 
 **Key Components**:
 - `MarketDatabase` - Database manager class
@@ -134,7 +137,7 @@ format_time_ago(timestamp) → str
 - Manage HTTP session
 - Error handling for network issues
 
-**Dependencies**: None (only requests library)
+**Dependencies**: `config.py` for base URL, timeouts, rate limits
 
 **Key Components**:
 - `RateLimiter` - Token bucket rate limiter
@@ -150,6 +153,7 @@ get_datacenters() → list
 get_most_recently_updated(world, entries) → Dict
 get_market_data(world, item_id) → Dict
 get_history(world, item_id, entries) → Dict
+fetch_teamcraft_items() → Dict[str, Dict]
 ```
 
 ---
@@ -172,6 +176,8 @@ get_history(world, item_id, entries) → Dict
        │   ├─> DB: save_snapshot()
        │   ├─> API: get_history()
        │   └─> DB: save_sales()
+    │
+    ├─> Config: read defaults (limits, timeouts)
        │
        └─> return (successful, failed, items)
 
@@ -314,7 +320,8 @@ def test_update_flow():
 universus/
 ├── universus.py          # CLI commands & orchestration (182 lines)
 ├── database.py           # Database operations (217 lines)
-├── api_client.py         # API client & rate limiting (123 lines)
+├── api_client.py         # API client & rate limiting (updated)
+├── config.py             # Configuration loader (TOML)
 ├── service.py            # Business logic (177 lines)
 ├── ui.py                 # UI presentation (213 lines)
 ├── requirements.txt      # Dependencies
@@ -325,7 +332,10 @@ universus/
 └── ARCHITECTURE.md       # This file
 ```
 
-**Total**: ~912 lines (down from 670 lines in monolithic version, but with better organization)
+**Highlights**:
+- Centralized configuration via `config.toml`
+- New `sync-items` command and `items` table
+- Tests expanded to 98, coverage improved
 
 ---
 
@@ -353,13 +363,8 @@ class CacheService:
         # Implementation
 ```
 
-### 2. Add Configuration Module
-```python
-# config.py
-class Config:
-    def load_from_file(self, path):
-        # Read .universusrc
-```
+### 2. Config Profiles & Environment Overrides
+Support multiple TOML profiles and environment variable overrides for deployment.
 
 ### 3. Add Export Service
 ```python

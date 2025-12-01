@@ -7,6 +7,7 @@ import sys
 import logging
 import click
 
+from config import get_config
 from database import MarketDatabase
 from api_client import UniversalisAPI
 from service import MarketService
@@ -14,22 +15,37 @@ from ui import MarketUI
 
 logger = logging.getLogger(__name__)
 
+# Load configuration
+config = get_config()
+
 
 @click.group()
 @click.version_option(version="1.0.0", prog_name="Universus")
-@click.option('--db-path', default='market_data.db', help='Path to database file')
+@click.option('--db-path', default=None, help='Path to database file')
 @click.option('--verbose', is_flag=True, help='Enable verbose logging')
+@click.option('--config-file', 'config_path', default=None, help='Path to config.toml file')
 @click.pass_context
-def cli(ctx, db_path, verbose):
+def cli(ctx, db_path, verbose, config_path):
     """Universus - FFXIV Market Price CLI using Universalis API."""
     ctx.ensure_object(dict)
     
+    # Load configuration (reload if custom path provided)
+    if config_path:
+        from config import reload_config
+        reload_config(config_path)
+    
+    # Use config default if db_path not provided
+    if db_path is None:
+        db_path = config.get('database', 'default_path', 'market_data.db')
+    
     # Setup logging
     log_level = logging.DEBUG if verbose else logging.INFO
+    log_format = config.get('logging', 'format', '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    date_format = config.get('logging', 'date_format', '%Y-%m-%d %H:%M:%S')
     logging.basicConfig(
         level=log_level,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S'
+        format=log_format,
+        datefmt=date_format
     )
     
     logger.info(f"Starting Universus CLI (verbose: {verbose})")
@@ -60,21 +76,23 @@ def datacenters(ctx):
     logger.info("Executing 'datacenters' command")
     service = ctx.obj['SERVICE']
     
-    with MarketUI.show_status("Fetching datacenters..."):
-        try:
+    try:
+        with MarketUI.show_status("Fetching datacenters..."):
             dcs = service.get_datacenters()
-        except Exception as e:
-            logger.error(f"Failed to fetch datacenters: {e}")
-            MarketUI.exit_with_error(str(e))
-    
-    MarketUI.show_datacenters(dcs)
+        
+        MarketUI.show_datacenters(dcs)
+    except Exception as e:
+        logger.error(f"Failed to fetch datacenters: {e}")
+        MarketUI.exit_with_error(str(e))
 
 
 @cli.command()
 @click.option('--world', required=True, help='World name (e.g., Behemoth)')
-@click.option('--limit', default=50, help='Number of top items to track (default: 50)')
+@click.option('--limit', default=None, type=int, help='Number of top items to track')
 @click.pass_context
 def init_tracking(ctx, world, limit):
+    if limit is None:
+        limit = config.get('cli', 'default_tracking_limit', 50)
     """Initialize tracking for top volume items on a world."""
     logger.info(f"Executing 'init-tracking' command for {world} (limit: {limit})")
     service = ctx.obj['SERVICE']
@@ -137,9 +155,11 @@ def update(ctx, world):
 
 @cli.command()
 @click.option('--world', required=True, help='World name')
-@click.option('--limit', default=10, help='Number of top items to show')
+@click.option('--limit', default=None, type=int, help='Number of top items to show')
 @click.pass_context
 def top(ctx, world, limit):
+    if limit is None:
+        limit = config.get('cli', 'default_top_limit', 10)
     """Show top selling items by volume on a world."""
     logger.info(f"Executing 'top' command for {world} (limit: {limit})")
     service = ctx.obj['SERVICE']
@@ -151,9 +171,11 @@ def top(ctx, world, limit):
 @cli.command()
 @click.option('--world', required=True, help='World name')
 @click.option('--item-id', required=True, type=int, help='Item ID to report on')
-@click.option('--days', default=30, help='Number of days to show (default: 30)')
+@click.option('--days', default=None, type=int, help='Number of days to show')
 @click.pass_context
 def report(ctx, world, item_id, days):
+    if days is None:
+        days = config.get('cli', 'default_report_days', 30)
     """Show detailed historical report for a specific item."""
     logger.info(f"Executing 'report' command for item {item_id} on {world} ({days} days)")
     service = ctx.obj['SERVICE']

@@ -10,6 +10,7 @@ A Python CLI tool for tracking Final Fantasy XIV market prices using the [Univer
 - 🔄 Automated data fetching with rate limiting
 - 🎨 Beautiful terminal UI with rich formatting
 - ⚡ Respects API rate limits (2 requests/second)
+ - 🔧 Centralized configuration via `config.toml`
 
 ## Installation
 
@@ -20,12 +21,46 @@ A Python CLI tool for tracking Final Fantasy XIV market prices using the [Univer
 pip install -r requirements.txt
 ```
 
+3. (Optional) Create a config file:
+
+```toml
+# config.toml
+[database]
+default_path = "market_data.db"
+
+[api]
+base_url = "https://universalis.app/api"
+timeout = 10
+rate_limit = 2.0
+max_items_per_query = 200
+default_history_entries = 100
+
+[teamcraft]
+items_url = "https://raw.githubusercontent.com/ffxiv-teamcraft/ffxiv-teamcraft/master/libs/data/src/lib/json/items.json"
+timeout = 30
+
+[cli]
+default_tracking_limit = 50
+default_top_limit = 10
+default_report_days = 30
+
+[logging]
+format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+date_format = "%Y-%m-%d %H:%M:%S"
+```
+
 ## Usage
 
 ### 1. List all datacenters
 
 ```bash
 python universus.py datacenters
+```
+
+Use a custom config:
+
+```bash
+python universus.py --config-file ./config.toml datacenters
 ```
 
 ### 2. Initialize tracking for a world
@@ -104,6 +139,16 @@ This command:
 
 **Note**: This is a one-time setup command, but can be run periodically to get updated item names from game patches.
 
+## Configuration
+
+The application reads defaults from `config.toml`. You can override per-run using CLI flags, or point to another config with `--config-file`.
+
+- `database.default_path`: SQLite file location
+- `api.*`: Base URL, timeouts, rate limits, query limits
+- `teamcraft.*`: Items dump URL and timeout
+- `cli.*`: Command defaults for limits and days
+- `logging.*`: Log formatting
+
 ## API Rate Limiting
 
 This tool implements conservative rate limiting based on the Universalis API implementation:
@@ -143,6 +188,7 @@ universus/
 ├── universus.py          # Main CLI application & command orchestration
 ├── database.py           # Database layer (SQLite operations)
 ├── api_client.py         # API client & rate limiting
+├── config.py             # Loads config from TOML
 ├── service.py            # Business logic layer
 ├── ui.py                 # Presentation layer (Rich UI)
 ├── market_data.db        # SQLite database (created on first run)
@@ -168,7 +214,7 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed design documentation.
 
 ## Testing
 
-Universus includes a comprehensive test suite with 88 tests covering all layers:
+Universus includes a comprehensive test suite with 98 tests covering all layers:
 
 ```bash
 # Install test dependencies
@@ -191,6 +237,7 @@ See [TESTING.md](TESTING.md) for detailed testing documentation.
 - API Client: 100%
 - Service Layer: 99%
 - UI Layer: 98%
+ - Items Sync: 99%
 
 ## Requirements
 
@@ -199,6 +246,7 @@ See [TESTING.md](TESTING.md) for detailed testing documentation.
 - requests
 - rich
 - sqlite3 (built-in)
+ - tomli (for Python < 3.11)
 
 ### Testing Requirements
 - pytest>=7.0.0
@@ -215,6 +263,12 @@ By default, the database is stored as `market_data.db` in the current directory.
 
 ```bash
 python universus.py --db-path /path/to/custom.db <command>
+```
+
+Or define in `config.toml` and pass `--config-file`:
+
+```bash
+python universus.py --config-file ./config.toml top --world Behemoth
 ```
 
 ## Tips

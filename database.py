@@ -7,13 +7,20 @@ import logging
 from datetime import datetime, timedelta
 from typing import Optional, List, Dict
 
+from config import get_config
+
 logger = logging.getLogger(__name__)
+
+# Load configuration
+config = get_config()
 
 
 class MarketDatabase:
     """Local SQLite database for tracking market data."""
     
-    def __init__(self, db_path: str = "market_data.db"):
+    def __init__(self, db_path: str = None):
+        if db_path is None:
+            db_path = config.get('database', 'default_path', 'market_data.db')
         self.db_path = db_path
         self.conn = None
         self._init_database()

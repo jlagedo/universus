@@ -6,10 +6,14 @@ import logging
 from typing import List, Dict, Tuple
 from datetime import datetime
 
+from config import get_config
 from database import MarketDatabase
-from api_client import UniversalisAPI, DEFAULT_HISTORY_ENTRIES
+from api_client import UniversalisAPI
 
 logger = logging.getLogger(__name__)
+
+# Load configuration
+config = get_config()
 
 
 class MarketService:
@@ -97,7 +101,7 @@ class MarketService:
                 self.db.save_snapshot(item_id, world, market_data)
                 
                 # Fetch and save recent sales history
-                history_data = self.api.get_history(world, item_id, entries=DEFAULT_HISTORY_ENTRIES)
+                history_data = self.api.get_history(world, item_id)
                 if 'entries' in history_data:
                     self.db.save_sales(item_id, world, history_data['entries'])
                 

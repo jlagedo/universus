@@ -1,6 +1,7 @@
 click>=8.0.0
 requests>=2.31.0
 rich>=13.0.0
+tomli>=2.0.0; python_version < '3.11'
 # No additional dependencies needed - uses Python's built-in sqlite3
 
 # Testing dependencies

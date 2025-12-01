@@ -1,0 +1,45 @@
+# Universus Configuration File
+
+[database]
+# Path to the SQLite database file
+default_path = "market_data.db"
+
+[api]
+# Universalis API base URL
+base_url = "https://universalis.app/api"
+
+# API request timeout in seconds
+timeout = 10
+
+# Rate limiting (requests per second)
+rate_limit = 2.0
+
+# Maximum items per query
+max_items_per_query = 200
+
+# Default number of history entries to fetch
+default_history_entries = 100
+
+[teamcraft]
+# FFXIV Teamcraft items data URL
+items_url = "https://raw.githubusercontent.com/ffxiv-teamcraft/ffxiv-teamcraft/master/libs/data/src/lib/json/items.json"
+
+# Timeout for Teamcraft API requests (larger file)
+timeout = 30
+
+[cli]
+# Default number of items to track when initializing
+default_tracking_limit = 50
+
+# Default number of top items to display
+default_top_limit = 10
+
+# Default number of days for reports
+default_report_days = 30
+
+[logging]
+# Log format
+format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+# Date format for logs
+date_format = "%Y-%m-%d %H:%M:%S"
