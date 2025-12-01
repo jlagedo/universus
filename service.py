@@ -6,6 +6,8 @@ import logging
 from typing import List, Dict, Tuple
 from datetime import datetime
 
+import requests
+
 from config import get_config
 from database import MarketDatabase
 from api_client import UniversalisAPI
@@ -64,7 +66,7 @@ class MarketService:
                     })
                     self.db.add_tracked_item(item_id, world)
                 
-            except Exception as e:
+            except (requests.RequestException, ConnectionError, TimeoutError, ValueError) as e:
                 logger.debug(f"Failed to fetch data for item {item_id}: {e}")
                 continue
         
@@ -107,7 +109,7 @@ class MarketService:
                 
                 successful += 1
                 
-            except Exception as e:
+            except (requests.RequestException, ConnectionError, TimeoutError, ValueError) as e:
                 logger.debug(f"Failed to update item {item_id}: {e}")
                 failed += 1
                 continue

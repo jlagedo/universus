@@ -112,6 +112,7 @@ class TestMarketService:
     
     def test_initialize_tracking_handles_api_errors(self, service, mock_db, mock_api):
         """Test that API errors are handled gracefully."""
+        import requests
         mock_api.get_most_recently_updated.return_value = {
             'items': [
                 {'itemID': 12345},
@@ -122,7 +123,7 @@ class TestMarketService:
         # First call succeeds, second fails
         mock_api.get_market_data.side_effect = [
             {'regularSaleVelocity': 10.0, 'averagePrice': 1000},
-            Exception("API Error")
+            requests.RequestException("API Error")
         ]
         
         top_items, total_found, items_with_sales = service.initialize_tracking('Behemoth', limit=50)
@@ -171,6 +172,7 @@ class TestMarketService:
     
     def test_update_tracked_items_partial_failure(self, service, mock_db, mock_api):
         """Test update with some failures."""
+        import requests
         mock_db.get_tracked_items.return_value = [
             {'item_id': 12345, 'world': 'Behemoth'},
             {'item_id': 67890, 'world': 'Behemoth'}
@@ -179,7 +181,7 @@ class TestMarketService:
         # First succeeds, second fails
         mock_api.get_market_data.side_effect = [
             {'regularSaleVelocity': 10.0, 'averagePrice': 1000},
-            Exception("API Error")
+            requests.RequestException("API Error")
         ]
         
         mock_api.get_history.return_value = {'entries': []}

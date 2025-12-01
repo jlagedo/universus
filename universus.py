@@ -91,9 +91,9 @@ def datacenters(ctx):
 @click.option('--limit', default=None, type=int, help='Number of top items to track')
 @click.pass_context
 def init_tracking(ctx, world, limit):
+    """Initialize tracking for top volume items on a world."""
     if limit is None:
         limit = config.get('cli', 'default_tracking_limit', 50)
-    """Initialize tracking for top volume items on a world."""
     logger.info(f"Executing 'init-tracking' command for {world} (limit: {limit})")
     service = ctx.obj['SERVICE']
     
@@ -158,9 +158,9 @@ def update(ctx, world):
 @click.option('--limit', default=None, type=int, help='Number of top items to show')
 @click.pass_context
 def top(ctx, world, limit):
+    """Show top selling items by volume on a world."""
     if limit is None:
         limit = config.get('cli', 'default_top_limit', 10)
-    """Show top selling items by volume on a world."""
     logger.info(f"Executing 'top' command for {world} (limit: {limit})")
     service = ctx.obj['SERVICE']
     
@@ -174,9 +174,9 @@ def top(ctx, world, limit):
 @click.option('--days', default=None, type=int, help='Number of days to show')
 @click.pass_context
 def report(ctx, world, item_id, days):
+    """Show detailed historical report for a specific item."""
     if days is None:
         days = config.get('cli', 'default_report_days', 30)
-    """Show detailed historical report for a specific item."""
     logger.info(f"Executing 'report' command for item {item_id} on {world} ({days} days)")
     service = ctx.obj['SERVICE']
     

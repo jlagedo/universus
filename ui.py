@@ -139,7 +139,7 @@ class MarketUI:
         table = Table(title=f"Top {len(items)} Items by Sales Volume on {world}",
                      show_header=True, header_style="bold magenta")
         table.add_column("Rank", style="cyan", width=6)
-        table.add_column("Item ID", style="yellow")
+        table.add_column("Item", style="yellow")
         table.add_column("Daily Sales", justify="right", style="green")
         table.add_column("Avg Price", justify="right", style="magenta")
         table.add_column("Last Updated", style="dim")
@@ -147,9 +147,10 @@ class MarketUI:
         for idx, item in enumerate(items, 1):
             time_str = format_time_func(item['last_updated'])
             
+            display_name = item.get('item_name') or str(item['item_id'])
             table.add_row(
                 str(idx),
-                str(item['item_id']),
+                display_name,
                 f"{item['sale_velocity']:.2f}" if item['sale_velocity'] else "N/A",
                 f"{item['average_price']:,.0f} gil" if item['average_price'] else "N/A",
                 time_str

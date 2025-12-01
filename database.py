@@ -30,6 +30,8 @@ class MarketDatabase:
         logger.info(f"Initializing database at {self.db_path}")
         self.conn = sqlite3.connect(self.db_path)
         self.conn.row_factory = sqlite3.Row
+        # Enable foreign key enforcement
+        self.conn.execute("PRAGMA foreign_keys = ON")
         cursor = self.conn.cursor()
         logger.debug("Creating database tables if not exist")
         
@@ -60,7 +62,6 @@ class MarketDatabase:
                 hq_sale_velocity REAL,
                 total_listings INTEGER,
                 last_upload_time INTEGER,
-                FOREIGN KEY (item_id) REFERENCES tracked_items(item_id),
                 UNIQUE(item_id, world, snapshot_date)
             )
         """)
@@ -85,8 +86,7 @@ class MarketDatabase:
                 quantity INTEGER NOT NULL,
                 is_hq BOOLEAN NOT NULL,
                 buyer_name TEXT,
-                recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (item_id) REFERENCES tracked_items(item_id)
+                recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
         
@@ -116,11 +116,24 @@ class MarketDatabase:
         cursor = self.conn.cursor()
         if world:
             cursor.execute(
-                "SELECT * FROM tracked_items WHERE world = ? ORDER BY last_updated DESC",
+                """
+                SELECT ti.*, it.name AS item_name
+                FROM tracked_items ti
+                LEFT JOIN items it ON it.item_id = ti.item_id
+                WHERE ti.world = ?
+                ORDER BY ti.last_updated DESC
+                """,
                 (world,)
             )
         else:
-            cursor.execute("SELECT * FROM tracked_items ORDER BY last_updated DESC")
+            cursor.execute(
+                """
+                SELECT ti.*, it.name AS item_name
+                FROM tracked_items ti
+                LEFT JOIN items it ON it.item_id = ti.item_id
+                ORDER BY ti.last_updated DESC
+                """
+            )
         results = [dict(row) for row in cursor.fetchall()]
         logger.debug(f"Found {len(results)} tracked items")
         return results
@@ -162,21 +175,20 @@ class MarketDatabase:
         """Save sales history entries."""
         logger.debug(f"Saving {len(entries)} sales entries for item {item_id} on {world}")
         cursor = self.conn.cursor()
-        new_entries = 0
         
+        # Get existing sale keys to filter duplicates in memory
+        cursor.execute("""
+            SELECT sale_time, price_per_unit FROM sales_history
+            WHERE item_id = ? AND world = ?
+        """, (item_id, world))
+        existing_keys = {(row[0], row[1]) for row in cursor.fetchall()}
+        
+        # Filter new entries and prepare for bulk insert
+        new_entries_data = []
         for entry in entries:
-            # Check if we already have this sale
-            cursor.execute("""
-                SELECT id FROM sales_history
-                WHERE item_id = ? AND world = ? AND sale_time = ? AND price_per_unit = ?
-            """, (item_id, world, entry.get('timestamp'), entry.get('pricePerUnit')))
-            
-            if cursor.fetchone() is None:
-                cursor.execute("""
-                    INSERT INTO sales_history (
-                        item_id, world, sale_time, price_per_unit, quantity, is_hq, buyer_name
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?)
-                """, (
+            sale_key = (entry.get('timestamp'), entry.get('pricePerUnit'))
+            if sale_key not in existing_keys:
+                new_entries_data.append((
                     item_id, world,
                     entry.get('timestamp'),
                     entry.get('pricePerUnit'),
@@ -184,41 +196,60 @@ class MarketDatabase:
                     entry.get('hq', False),
                     entry.get('buyerName')
                 ))
-                new_entries += 1
+        
+        # Bulk insert new entries
+        if new_entries_data:
+            cursor.executemany("""
+                INSERT INTO sales_history (
+                    item_id, world, sale_time, price_per_unit, quantity, is_hq, buyer_name
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, new_entries_data)
         
         self.conn.commit()
-        logger.debug(f"Saved {new_entries} new sales entries (skipped {len(entries) - new_entries} duplicates)")
+        logger.debug(f"Saved {len(new_entries_data)} new sales entries (skipped {len(entries) - len(new_entries_data)} duplicates)")
     
     def get_snapshots(self, item_id: int, world: str, days: int = 30) -> List[Dict]:
         """Get historical snapshots for an item."""
         cursor = self.conn.cursor()
-        cutoff_date = (datetime.now().date() - timedelta(days=days)).isoformat()  # Convert to ISO format string
-        
-        cursor.execute("""
+        cutoff_date = (datetime.now().date() - timedelta(days=days)).isoformat()
+        cursor.execute(
+            """
             SELECT * FROM daily_snapshots
             WHERE item_id = ? AND world = ? AND snapshot_date >= ?
             ORDER BY snapshot_date DESC
-        """, (item_id, world, cutoff_date))
-        
+            """,
+            (item_id, world, cutoff_date)
+        )
         return [dict(row) for row in cursor.fetchall()]
-    
+
     def get_top_volume_items(self, world: str, limit: int = 10) -> List[Dict]:
         """Get items with highest sale velocity from latest snapshots."""
         cursor = self.conn.cursor()
-        
-        cursor.execute("""
-            SELECT ds.item_id, ds.world, ds.sale_velocity, ds.average_price,
-                   ds.snapshot_date, ti.last_updated
+        cursor.execute(
+            """
+            SELECT ds.item_id,
+                   it.name AS item_name,
+                   ds.world,
+                   ds.sale_velocity,
+                   ds.average_price,
+                   ds.snapshot_date,
+                   ti.last_updated
             FROM daily_snapshots ds
-            JOIN tracked_items ti ON ds.item_id = ti.item_id AND ds.world = ti.world
-            WHERE ds.world = ? AND ds.snapshot_date = (
-                SELECT MAX(snapshot_date) FROM daily_snapshots ds2
+            JOIN tracked_items ti
+              ON ds.item_id = ti.item_id AND ds.world = ti.world
+            LEFT JOIN items it
+              ON it.item_id = ds.item_id
+            WHERE ds.world = ?
+              AND ds.snapshot_date = (
+                SELECT MAX(snapshot_date)
+                FROM daily_snapshots ds2
                 WHERE ds2.item_id = ds.item_id AND ds2.world = ds.world
-            )
+              )
             ORDER BY ds.sale_velocity DESC
             LIMIT ?
-        """, (world, limit))
-        
+            """,
+            (world, limit)
+        )
         return [dict(row) for row in cursor.fetchall()]
     
     def __enter__(self):

@@ -27,6 +27,9 @@ items_url = "https://raw.githubusercontent.com/ffxiv-teamcraft/ffxiv-teamcraft/m
 # Timeout for Teamcraft API requests (larger file)
 timeout = 30
 
+# Maximum retry attempts for failed requests
+max_retries = 3
+
 [cli]
 # Default number of items to track when initializing
 default_tracking_limit = 50

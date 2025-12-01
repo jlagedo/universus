@@ -131,10 +131,24 @@ class UniversalisAPI:
         logger.info("Fetching items from FFXIV Teamcraft")
         url = config.get('teamcraft', 'items_url', 'https://raw.githubusercontent.com/ffxiv-teamcraft/ffxiv-teamcraft/master/libs/data/src/lib/json/items.json')
         timeout = config.get('teamcraft', 'timeout', 30)
+        max_retries = config.get('teamcraft', 'max_retries', 3)
         
-        # Don't apply rate limiting for external API
-        response = self.session.get(url, timeout=timeout)
-        response.raise_for_status()
-        data = response.json()
-        logger.info(f"Retrieved {len(data)} items from Teamcraft")
-        return data
+        # Retry with exponential backoff for external API
+        last_exception = None
+        for attempt in range(max_retries):
+            try:
+                response = self.session.get(url, timeout=timeout)
+                response.raise_for_status()
+                data = response.json()
+                logger.info(f"Retrieved {len(data)} items from Teamcraft")
+                return data
+            except (requests.RequestException, ValueError) as e:
+                last_exception = e
+                if attempt < max_retries - 1:
+                    wait_time = 2 ** attempt  # Exponential backoff: 1s, 2s, 4s
+                    logger.warning(f"Teamcraft request failed (attempt {attempt + 1}/{max_retries}): {e}. Retrying in {wait_time}s...")
+                    time.sleep(wait_time)
+                else:
+                    logger.error(f"Teamcraft request failed after {max_retries} attempts: {e}")
+        
+        raise last_exception
