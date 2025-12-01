@@ -6,9 +6,9 @@ Universus includes a comprehensive test suite following Python testing standards
 
 ## Test Statistics
 
-- **Total Tests**: 88
-- **Test Files**: 4
-- **Coverage**: 66% overall, 100% for tested modules
+- **Total Tests**: 98
+- **Test Files**: 5
+- **Coverage**: 67% overall, 100% for tested modules
 - **Framework**: pytest 7.0+
 
 ## Test Structure
@@ -19,6 +19,7 @@ universus/
 ├── test_api_client.py    # API client tests (20 tests)
 ├── test_service.py       # Service layer tests (23 tests)
 ├── test_ui.py            # UI layer tests (28 tests)
+├── test_items_sync.py    # Items sync tests (10 tests)
 └── pytest.ini            # Pytest configuration
 ```
 
@@ -161,6 +162,28 @@ def test_show_datacenters_with_data(mock_console)
 def test_show_top_items_with_null_values(mock_console)
 def test_show_trends_positive_change(mock_console)
 def test_exit_with_error(mock_console)
+```
+
+### Items Sync (test_items_sync.py)
+**Coverage: 99%** | **10 tests**
+
+Tests for item database synchronization:
+
+- ✅ Items table creation and schema validation
+- ✅ Storing item data from Teamcraft dump
+- ✅ Replacing existing data on re-sync
+- ✅ Skipping invalid item IDs
+- ✅ Handling empty names
+- ✅ Fetching items from external API
+- ✅ Service layer integration
+
+**Key Test Cases:**
+```python
+def test_sync_items_stores_data(db)
+def test_sync_items_replaces_existing_data(db)
+def test_sync_items_skips_invalid_ids(db)
+def test_api_fetch_teamcraft_items()
+def test_service_sync_items_database(service, api, db)
 ```
 
 ## Testing Patterns Used

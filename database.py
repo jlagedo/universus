@@ -58,6 +58,15 @@ class MarketDatabase:
             )
         """)
         
+        # Table for item names
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS items (
+                item_id INTEGER PRIMARY KEY,
+                name TEXT NOT NULL,
+                last_synced TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
         # Table for individual sales
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS sales_history (
@@ -213,6 +222,55 @@ class MarketDatabase:
         """Context manager exit - ensures connection is closed."""
         self.close()
         return False
+    
+    def sync_items(self, items_data: Dict[str, Dict]) -> int:
+        """Sync item names from Teamcraft data dump.
+        
+        Args:
+            items_data: Dictionary mapping item_id (as string) to item data with 'en' field
+            
+        Returns:
+            Number of items synced
+        """
+        logger.info(f"Syncing {len(items_data)} items to database")
+        cursor = self.conn.cursor()
+        
+        # Clear existing items
+        logger.debug("Clearing existing items table")
+        cursor.execute("DELETE FROM items")
+        
+        # Insert all items
+        count = 0
+        for item_id_str, item_data in items_data.items():
+            try:
+                item_id = int(item_id_str)
+                name = item_data.get('en', '')
+                if name:  # Only insert items with names
+                    cursor.execute(
+                        "INSERT INTO items (item_id, name) VALUES (?, ?)",
+                        (item_id, name)
+                    )
+                    count += 1
+            except (ValueError, TypeError) as e:
+                logger.warning(f"Skipping invalid item {item_id_str}: {e}")
+                continue
+        
+        self.conn.commit()
+        logger.info(f"Successfully synced {count} items")
+        return count
+    
+    def get_item_name(self, item_id: int) -> Optional[str]:
+        """Get item name by ID."""
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT name FROM items WHERE item_id = ?", (item_id,))
+        row = cursor.fetchone()
+        return row['name'] if row else None
+    
+    def get_items_count(self) -> int:
+        """Get total count of items in database."""
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT COUNT(*) as count FROM items")
+        return cursor.fetchone()['count']
     
     def close(self):
         """Close database connection."""

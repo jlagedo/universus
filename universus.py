@@ -184,5 +184,26 @@ def list_tracked(ctx):
     MarketUI.show_tracked_summary(by_world)
 
 
+@cli.command()
+@click.pass_context
+def sync_items(ctx):
+    """Sync item names from FFXIV Teamcraft data dump.
+    
+    This command fetches the latest item database from FFXIV Teamcraft
+    and updates the local database. Any existing items will be replaced.
+    """
+    logger.info("Executing 'sync-items' command")
+    service = ctx.obj['SERVICE']
+    
+    try:
+        with MarketUI.show_status("Fetching items from FFXIV Teamcraft (this may take a moment)..."):
+            count = service.sync_items_database()
+        
+        MarketUI.print_success(f"Successfully synced {count:,} items to local database")
+    except Exception as e:
+        logger.error(f"Failed to sync items: {e}")
+        MarketUI.exit_with_error(f"Failed to sync items: {str(e)}")
+
+
 if __name__ == "__main__":
     cli(obj={})

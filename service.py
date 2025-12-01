@@ -176,3 +176,15 @@ class MarketService:
             return f"{time_ago.seconds // 3600}h ago"
         else:
             return f"{time_ago.seconds // 60}m ago"
+    
+    def sync_items_database(self) -> int:
+        """Sync item names from FFXIV Teamcraft data dump.
+        
+        Returns:
+            Number of items synced
+        """
+        logger.info("Starting items database sync")
+        items_data = self.api.fetch_teamcraft_items()
+        count = self.db.sync_items(items_data)
+        logger.info(f"Items sync complete: {count} items")
+        return count

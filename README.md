@@ -88,6 +88,22 @@ Shows 30-day historical data including:
 python universus.py list-tracked
 ```
 
+### 7. Sync item names database
+
+Download and sync the complete item name database from FFXIV Teamcraft:
+
+```bash
+python universus.py sync-items
+```
+
+This command:
+- Fetches ~47,000 item names from the FFXIV Teamcraft data dump
+- Stores them in the local database for reference
+- Replaces existing data if run again (to get updates)
+- Useful for looking up item names by ID in future features
+
+**Note**: This is a one-time setup command, but can be run periodically to get updated item names from game patches.
+
 ## API Rate Limiting
 
 This tool implements conservative rate limiting based on the Universalis API implementation:

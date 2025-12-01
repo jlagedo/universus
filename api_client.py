@@ -115,3 +115,19 @@ class UniversalisAPI:
             f"{self.BASE_URL}/history/{world}/{item_id}",
             params={"entries": entries}
         )
+    
+    def fetch_teamcraft_items(self) -> Dict[str, Dict]:
+        """Fetch item names from FFXIV Teamcraft data dump.
+        
+        Returns:
+            Dictionary mapping item_id (string) to item data with 'en' field
+        """
+        logger.info("Fetching items from FFXIV Teamcraft")
+        url = "https://raw.githubusercontent.com/ffxiv-teamcraft/ffxiv-teamcraft/master/libs/data/src/lib/json/items.json"
+        
+        # Don't apply rate limiting for external API
+        response = self.session.get(url, timeout=30)  # Longer timeout for large file
+        response.raise_for_status()
+        data = response.json()
+        logger.info(f"Retrieved {len(data)} items from Teamcraft")
+        return data
