@@ -127,6 +127,15 @@ class UniversalisAPI:
                 if attempt < max_retries - 1:
                     wait_time = 2 ** attempt  # Exponential backoff: 1s, 2s, 4s
                     logger.warning(f"API request failed (attempt {attempt + 1}/{max_retries}): {e}. Retrying in {wait_time}s...")
+                    # Recreate session on connection errors
+                    try:
+                        self.session.close()
+                    except:
+                        pass
+                    self.session = requests.Session()
+                    self.session.headers.update({
+                        "User-Agent": f"Universus-CLI/{API_VERSION}"
+                    })
                     time.sleep(wait_time)
                 else:
                     logger.error(f"API request failed after {max_retries} attempts: {url} - {e}")

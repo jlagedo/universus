@@ -11,6 +11,7 @@ import logging
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 
+import requests
 from nicegui import ui, app
 
 from config import get_config
@@ -43,6 +44,30 @@ def init_services():
     api = UniversalisAPI()
     service = MarketService(db, api)
     logger.info(f"Services initialized with database: {db_path}")
+
+
+def ensure_api_connection():
+    """Ensure API client has a fresh connection."""
+    global api, service
+    try:
+        # Test the connection with a lightweight request
+        test_response = api.session.get(f"{api.base_url}/data-centers", timeout=2)
+        test_response.raise_for_status()
+        logger.debug("API connection verified")
+    except (requests.exceptions.ConnectionError, 
+            requests.exceptions.Timeout,
+            requests.exceptions.HTTPError,
+            Exception) as e:
+        logger.warning(f"API connection lost or unhealthy, reinitializing: {e}")
+        # Close old session and create new API client
+        if api:
+            try:
+                api.close()
+            except:
+                pass
+        api = UniversalisAPI()
+        service = MarketService(db, api)
+        logger.info("API client reinitialized with fresh session")
 
 
 def format_gil(amount: Optional[float]) -> str:
@@ -101,6 +126,9 @@ class UniversusGUI:
     async def load_datacenters(self):
         """Load datacenters and worlds from API."""
         try:
+            # Ensure we have a valid API connection
+            ensure_api_connection()
+            
             # Fetch worlds first to build ID-to-name mapping
             worlds_data = api.get_worlds()
             self.world_id_to_name = {w['id']: w['name'] for w in worlds_data}
@@ -378,6 +406,7 @@ class UniversusGUI:
         async def fetch_datacenters():
             self.set_status('Fetching datacenters...')
             try:
+                ensure_api_connection()
                 await self.load_datacenters()
                 self.set_status('Ready')
                 self._render_datacenters_table()
@@ -438,6 +467,7 @@ class UniversusGUI:
             async def fetch_top():
                 self.set_status(f'Fetching top {int(limit_input.value)} items...')
                 try:
+                    ensure_api_connection()
                     top_items = service.get_top_items(self.selected_world, int(limit_input.value))
                     self._render_top_items_table(top_items)
                     self.set_status('Ready')
@@ -558,6 +588,9 @@ class UniversusGUI:
                     self.set_status('Initializing tracking...')
                     
                     try:
+                        # Ensure fresh API connection before long operation
+                        ensure_api_connection()
+                        
                         status_text.set_text('Fetching market data...')
                         progress.set_value(0.3)
                         await asyncio.sleep(0.1)
@@ -651,6 +684,9 @@ class UniversusGUI:
                     self.set_status('Updating market data...')
                     
                     try:
+                        # Ensure fresh API connection before long operation
+                        ensure_api_connection()
+                        
                         status_text.set_text('Fetching market data and history...')
                         progress.set_value(0.1)
                         
@@ -720,6 +756,7 @@ class UniversusGUI:
                 self.set_status(f'Generating report for item {item_id}...')
                 
                 try:
+                    ensure_api_connection()
                     snapshots = service.get_item_report(self.selected_world, item_id, days)
                     
                     with report_container:
@@ -812,6 +849,9 @@ class UniversusGUI:
                     self.set_status('Syncing items...')
                     
                     try:
+                        # Ensure fresh API connection before long operation
+                        ensure_api_connection()
+                        
                         # Run the sync
                         count = service.sync_items_database()
                         
