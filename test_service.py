@@ -120,10 +120,10 @@ class TestMarketService:
             ]
         }
         
-        # First call succeeds, second fails
+        # First call succeeds, second fails with network error
         mock_api.get_market_data.side_effect = [
             {'regularSaleVelocity': 10.0, 'averagePrice': 1000},
-            requests.RequestException("API Error")
+            requests.ConnectionError("Connection Error")
         ]
         
         top_items, total_found, items_with_sales = service.initialize_tracking('Behemoth', limit=50)
@@ -178,10 +178,10 @@ class TestMarketService:
             {'item_id': 67890, 'world': 'Behemoth'}
         ]
         
-        # First succeeds, second fails
+        # First succeeds, second fails with network error
         mock_api.get_market_data.side_effect = [
             {'regularSaleVelocity': 10.0, 'averagePrice': 1000},
-            requests.RequestException("API Error")
+            requests.ConnectionError("Connection Error")
         ]
         
         mock_api.get_history.return_value = {'entries': []}

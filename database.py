@@ -310,6 +310,18 @@ class MarketDatabase:
         cursor.execute("SELECT COUNT(*) as count FROM items")
         return cursor.fetchone()['count']
     
+    def get_tracked_items_count(self, world: str = None) -> int:
+        """Get count of tracked items, optionally filtered by world."""
+        cursor = self.conn.cursor()
+        if world:
+            cursor.execute(
+                "SELECT COUNT(*) as count FROM tracked_items WHERE world = ?",
+                (world,)
+            )
+        else:
+            cursor.execute("SELECT COUNT(*) as count FROM tracked_items")
+        return cursor.fetchone()['count']
+    
     def close(self):
         """Close database connection."""
         if self.conn:

@@ -13,6 +13,9 @@ from api_client import UniversalisAPI
 from service import MarketService
 from ui import MarketUI
 
+# Application version - single source of truth
+__version__ = "1.0.0"
+
 logger = logging.getLogger(__name__)
 
 # Load configuration
@@ -20,7 +23,7 @@ config = get_config()
 
 
 @click.group()
-@click.version_option(version="1.0.0", prog_name="Universus")
+@click.version_option(version=__version__, prog_name="Universus")
 @click.option('--db-path', default=None, help='Path to database file')
 @click.option('--verbose', is_flag=True, help='Enable verbose logging')
 @click.option('--config-file', 'config_path', default=None, help='Path to config.toml file')
@@ -131,24 +134,25 @@ def update(ctx, world):
     """Update market data for all tracked items on a world."""
     logger.info(f"Executing 'update' command for {world}")
     service = ctx.obj['SERVICE']
+    db = ctx.obj['DB']
     
-    # Get tracked items first
-    tracked_items = ctx.obj['DB'].get_tracked_items(world)
+    # Get tracked items count for display
+    tracked_count = db.get_tracked_items_count(world)
     
-    if not tracked_items:
+    if tracked_count == 0:
         MarketUI.print_warning(f"No items being tracked for {world}. Run 'init-tracking' first.")
         return
     
-    MarketUI.show_update_header(world, len(tracked_items))
+    MarketUI.show_update_header(world, tracked_count)
     
-    with MarketUI.show_update_progress(len(tracked_items)) as progress:
-        task = progress.add_task("Fetching market data...", total=len(tracked_items))
+    with MarketUI.show_update_progress(tracked_count) as progress:
+        task = progress.add_task("Fetching market data...", total=tracked_count)
         
-        # Update items (service handles progress internally)
+        # Update items (service handles the actual query)
         successful, failed, _ = service.update_tracked_items(world)
         
         # Update progress to complete
-        progress.update(task, completed=len(tracked_items))
+        progress.update(task, completed=tracked_count)
     
     MarketUI.show_update_results(successful, failed)
 

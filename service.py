@@ -66,8 +66,8 @@ class MarketService:
                     })
                     self.db.add_tracked_item(item_id, world)
                 
-            except (requests.RequestException, ConnectionError, TimeoutError, ValueError) as e:
-                logger.debug(f"Failed to fetch data for item {item_id}: {e}")
+            except (requests.RequestException, ConnectionError, TimeoutError) as e:
+                logger.warning(f"Failed to fetch data for item {item_id}: {e}")
                 continue
         
         # Sort by velocity and return top items
@@ -109,8 +109,8 @@ class MarketService:
                 
                 successful += 1
                 
-            except (requests.RequestException, ConnectionError, TimeoutError, ValueError) as e:
-                logger.debug(f"Failed to update item {item_id}: {e}")
+            except (requests.RequestException, ConnectionError, TimeoutError) as e:
+                logger.warning(f"Failed to update item {item_id}: {e}")
                 failed += 1
                 continue
         
@@ -156,12 +156,12 @@ class MarketService:
         oldest = snapshots[-1]
         trends = {}
         
-        if latest['sale_velocity'] and oldest['sale_velocity']:
+        if latest['sale_velocity'] and oldest['sale_velocity'] and oldest['sale_velocity'] != 0:
             velocity_change = ((latest['sale_velocity'] - oldest['sale_velocity']) / 
                              oldest['sale_velocity'] * 100)
             trends['velocity_change'] = velocity_change
         
-        if latest['average_price'] and oldest['average_price']:
+        if latest['average_price'] and oldest['average_price'] and oldest['average_price'] != 0:
             price_change = ((latest['average_price'] - oldest['average_price']) / 
                           oldest['average_price'] * 100)
             trends['price_change'] = price_change

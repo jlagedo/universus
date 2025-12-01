@@ -273,3 +273,29 @@ class TestMarketDatabase:
         db.close()
         db.close()  # Should not raise exception
         assert db.conn is None
+    
+    def test_get_tracked_items_count_empty(self, db):
+        """Test getting tracked items count when empty."""
+        count = db.get_tracked_items_count()
+        assert count == 0
+    
+    def test_get_tracked_items_count_all(self, db):
+        """Test getting total tracked items count."""
+        db.add_tracked_item(12345, "Behemoth")
+        db.add_tracked_item(67890, "Behemoth")
+        db.add_tracked_item(11111, "Excalibur")
+        
+        count = db.get_tracked_items_count()
+        assert count == 3
+    
+    def test_get_tracked_items_count_by_world(self, db):
+        """Test getting tracked items count filtered by world."""
+        db.add_tracked_item(12345, "Behemoth")
+        db.add_tracked_item(67890, "Behemoth")
+        db.add_tracked_item(11111, "Excalibur")
+        
+        behemoth_count = db.get_tracked_items_count("Behemoth")
+        excalibur_count = db.get_tracked_items_count("Excalibur")
+        
+        assert behemoth_count == 2
+        assert excalibur_count == 1

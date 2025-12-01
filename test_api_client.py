@@ -5,9 +5,38 @@ Unit tests for the API client layer.
 import pytest
 import time
 from unittest.mock import Mock, patch, MagicMock
-from api_client import RateLimiter, UniversalisAPI
+from api_client import RateLimiter, UniversalisAPI, validate_world_name, API_VERSION
 from config import get_config
 import requests
+
+
+class TestWorldNameValidation:
+    """Test suite for world name validation."""
+    
+    def test_valid_world_names(self):
+        """Test that valid world names pass validation."""
+        valid_names = ['Behemoth', 'Excalibur', 'Coeurl', 'Faerie', 'Lamia', 'Siren']
+        for name in valid_names:
+            assert validate_world_name(name) == name
+    
+    def test_invalid_world_name_empty(self):
+        """Test that empty world name raises ValueError."""
+        with pytest.raises(ValueError) as exc_info:
+            validate_world_name('')
+        assert 'Invalid world name' in str(exc_info.value)
+    
+    def test_invalid_world_name_none(self):
+        """Test that None world name raises ValueError."""
+        with pytest.raises(ValueError) as exc_info:
+            validate_world_name(None)
+        assert 'Invalid world name' in str(exc_info.value)
+    
+    def test_invalid_world_name_special_chars(self):
+        """Test that world names with special characters raise ValueError."""
+        invalid_names = ['World;DROP TABLE', 'Test<script>', '../../../etc/passwd']
+        for name in invalid_names:
+            with pytest.raises(ValueError):
+                validate_world_name(name)
 
 
 class TestRateLimiter:
@@ -86,7 +115,7 @@ class TestUniversalisAPI:
         mock_session.headers.update.assert_called_once()
         call_args = mock_session.headers.update.call_args[0][0]
         assert 'User-Agent' in call_args
-        assert call_args['User-Agent'] == "Universus-CLI/1.0"
+        assert call_args['User-Agent'] == f"Universus-CLI/{API_VERSION}"
     
     def test_context_manager(self, mock_session):
         """Test API client as context manager."""
@@ -265,3 +294,71 @@ class TestUniversalisAPI:
         
         # Should take at least 0.5s due to rate limiting (2 req/sec)
         assert elapsed >= 0.49
+    
+    def test_retry_on_timeout(self, api, mock_session):
+        """Test that timeouts trigger retry."""
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {'data': 'success'}
+        
+        # First call times out, second succeeds
+        mock_session.get.side_effect = [
+            requests.Timeout("Request timeout"),
+            mock_response
+        ]
+        
+        result = api._make_request("https://test.com/api", max_retries=2)
+        
+        assert result == {'data': 'success'}
+        assert mock_session.get.call_count == 2
+    
+    def test_retry_on_connection_error(self, api, mock_session):
+        """Test that connection errors trigger retry."""
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {'data': 'success'}
+        
+        # First two calls fail, third succeeds
+        mock_session.get.side_effect = [
+            requests.ConnectionError("Connection failed"),
+            requests.ConnectionError("Connection failed"),
+            mock_response
+        ]
+        
+        result = api._make_request("https://test.com/api", max_retries=3)
+        
+        assert result == {'data': 'success'}
+        assert mock_session.get.call_count == 3
+    
+    def test_retry_exhausted(self, api, mock_session):
+        """Test that exception is raised after all retries exhausted."""
+        mock_session.get.side_effect = requests.Timeout("Request timeout")
+        
+        with pytest.raises(requests.Timeout):
+            api._make_request("https://test.com/api", max_retries=3)
+        
+        assert mock_session.get.call_count == 3
+    
+    def test_no_retry_on_http_error(self, api, mock_session):
+        """Test that HTTP errors (4xx, 5xx) don't trigger retry."""
+        mock_response = Mock()
+        mock_response.raise_for_status.side_effect = requests.HTTPError("404 Not Found")
+        mock_session.get.return_value = mock_response
+        
+        with pytest.raises(requests.HTTPError):
+            api._make_request("https://test.com/api", max_retries=3)
+        
+        # Should only be called once - no retry for HTTP errors
+        assert mock_session.get.call_count == 1
+    
+    def test_world_validation_in_get_market_data(self, api, mock_session):
+        """Test that world name is validated in get_market_data."""
+        with pytest.raises(ValueError) as exc_info:
+            api.get_market_data('invalid;world', 12345)
+        assert 'Invalid world name' in str(exc_info.value)
+    
+    def test_world_validation_in_get_history(self, api, mock_session):
+        """Test that world name is validated in get_history."""
+        with pytest.raises(ValueError) as exc_info:
+            api.get_history('../../../etc', 12345)
+        assert 'Invalid world name' in str(exc_info.value)

@@ -4,7 +4,8 @@ API client for interacting with the Universalis API.
 
 import time
 import logging
-from typing import Optional, Dict, Any
+import re
+from typing import Optional, Dict, Any, List
 import requests
 
 from config import get_config
@@ -13,6 +14,29 @@ logger = logging.getLogger(__name__)
 
 # Load configuration
 config = get_config()
+
+# Valid world name pattern (alphanumeric, allows spaces for multi-word names)
+WORLD_NAME_PATTERN = re.compile(r'^[A-Za-z][A-Za-z0-9\s-]{1,30}$')
+
+# API client version - should match universus.__version__
+API_VERSION = "1.0.0"
+
+
+def validate_world_name(world: str) -> str:
+    """Validate and return a world name.
+    
+    Args:
+        world: World name to validate
+        
+    Returns:
+        The validated world name
+        
+    Raises:
+        ValueError: If world name is invalid
+    """
+    if not world or not WORLD_NAME_PATTERN.match(world):
+        raise ValueError(f"Invalid world name: '{world}'. World names must be alphanumeric.")
+    return world
 
 
 class RateLimiter:
@@ -52,7 +76,7 @@ class UniversalisAPI:
         self.rate_limiter = rate_limiter or RateLimiter()
         self.session = requests.Session()
         self.session.headers.update({
-            "User-Agent": "Universus-CLI/1.0"
+            "User-Agent": f"Universus-CLI/{API_VERSION}"
         })
         logger.info(f"Universalis API client initialized (timeout: {timeout}s)")
     
@@ -72,20 +96,45 @@ class UniversalisAPI:
         self.close()
         return False
     
-    def _make_request(self, url: str, params: Optional[Dict] = None) -> Any:
-        """Make a rate-limited request to the API."""
+    def _make_request(self, url: str, params: Optional[Dict[str, Any]] = None, max_retries: int = 3) -> Dict[str, Any]:
+        """Make a rate-limited request to the API with retry logic.
+        
+        Args:
+            url: API endpoint URL
+            params: Optional query parameters
+            max_retries: Maximum number of retry attempts for transient errors
+            
+        Returns:
+            JSON response data
+            
+        Raises:
+            requests.RequestException: If request fails after all retries
+        """
         logger.debug(f"Making API request: {url}" + (f" with params: {params}" if params else ""))
-        self.rate_limiter.wait()
-        try:
-            response = self.session.get(url, params=params, timeout=self.timeout)
-            logger.debug(f"Response status: {response.status_code}")
-            response.raise_for_status()
-            data = response.json()
-            logger.debug(f"Response received: {len(str(data))} bytes")
-            return data
-        except requests.RequestException as e:
-            logger.error(f"API request failed: {url} - {e}")
-            raise
+        
+        last_exception = None
+        for attempt in range(max_retries):
+            self.rate_limiter.wait()
+            try:
+                response = self.session.get(url, params=params, timeout=self.timeout)
+                logger.debug(f"Response status: {response.status_code}")
+                response.raise_for_status()
+                data = response.json()
+                logger.debug(f"Response received: {len(str(data))} bytes")
+                return data
+            except (requests.Timeout, requests.ConnectionError) as e:
+                last_exception = e
+                if attempt < max_retries - 1:
+                    wait_time = 2 ** attempt  # Exponential backoff: 1s, 2s, 4s
+                    logger.warning(f"API request failed (attempt {attempt + 1}/{max_retries}): {e}. Retrying in {wait_time}s...")
+                    time.sleep(wait_time)
+                else:
+                    logger.error(f"API request failed after {max_retries} attempts: {url} - {e}")
+            except requests.RequestException as e:
+                logger.error(f"API request failed: {url} - {e}")
+                raise
+        
+        raise last_exception
     
     def get_datacenters(self) -> list:
         """Fetch all available datacenters from the API."""
@@ -94,8 +143,9 @@ class UniversalisAPI:
         logger.info(f"Retrieved {len(result)} datacenters")
         return result
     
-    def get_most_recently_updated(self, world: str, entries: int = None) -> Dict:
+    def get_most_recently_updated(self, world: str, entries: int = None) -> Dict[str, Any]:
         """Fetch most recently updated items for a world."""
+        validate_world_name(world)
         if entries is None:
             entries = config.get('api', 'max_items_per_query', 200)
         max_items = config.get('api', 'max_items_per_query', 200)
@@ -107,13 +157,15 @@ class UniversalisAPI:
         logger.info(f"Retrieved {len(result.get('items', []))} items")
         return result
     
-    def get_market_data(self, world: str, item_id: int) -> Dict:
+    def get_market_data(self, world: str, item_id: int) -> Dict[str, Any]:
         """Fetch current market data for an item on a world."""
+        validate_world_name(world)
         logger.debug(f"Fetching market data for item {item_id} on {world}")
         return self._make_request(f"{self.base_url}/{world}/{item_id}")
     
-    def get_history(self, world: str, item_id: int, entries: int = None) -> Dict:
+    def get_history(self, world: str, item_id: int, entries: int = None) -> Dict[str, Any]:
         """Fetch sales history for an item on a world."""
+        validate_world_name(world)
         if entries is None:
             entries = config.get('api', 'default_history_entries', 100)
         logger.debug(f"Fetching history for item {item_id} on {world} (limit: {entries})")
