@@ -1,0 +1,188 @@
+#!/usr/bin/env python3
+"""
+Universus - A CLI for Final Fantasy XIV market prices using the Universalis API.
+"""
+
+import sys
+import logging
+import click
+
+from database import MarketDatabase
+from api_client import UniversalisAPI
+from service import MarketService
+from ui import MarketUI
+
+logger = logging.getLogger(__name__)
+
+
+@click.group()
+@click.version_option(version="1.0.0", prog_name="Universus")
+@click.option('--db-path', default='market_data.db', help='Path to database file')
+@click.option('--verbose', is_flag=True, help='Enable verbose logging')
+@click.pass_context
+def cli(ctx, db_path, verbose):
+    """Universus - FFXIV Market Price CLI using Universalis API."""
+    ctx.ensure_object(dict)
+    
+    # Setup logging
+    log_level = logging.DEBUG if verbose else logging.INFO
+    logging.basicConfig(
+        level=log_level,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+    
+    logger.info(f"Starting Universus CLI (verbose: {verbose})")
+    logger.debug(f"Database path: {db_path}")
+    
+    ctx.obj['DB_PATH'] = db_path
+    ctx.obj['API'] = UniversalisAPI()
+    ctx.obj['DB'] = MarketDatabase(db_path)
+    ctx.obj['SERVICE'] = MarketService(ctx.obj['DB'], ctx.obj['API'])
+
+
+@cli.result_callback()
+@click.pass_context
+def cleanup(ctx, result, **kwargs):
+    """Cleanup resources after command execution."""
+    logger.debug("Starting cleanup of resources")
+    if 'DB' in ctx.obj and ctx.obj['DB']:
+        ctx.obj['DB'].close()
+    if 'API' in ctx.obj and ctx.obj['API']:
+        ctx.obj['API'].close()
+    logger.info("Cleanup complete")
+
+
+@cli.command()
+@click.pass_context
+def datacenters(ctx):
+    """List all available FFXIV datacenters."""
+    logger.info("Executing 'datacenters' command")
+    service = ctx.obj['SERVICE']
+    
+    with MarketUI.show_status("Fetching datacenters..."):
+        try:
+            dcs = service.get_datacenters()
+        except Exception as e:
+            logger.error(f"Failed to fetch datacenters: {e}")
+            MarketUI.exit_with_error(str(e))
+    
+    MarketUI.show_datacenters(dcs)
+
+
+@cli.command()
+@click.option('--world', required=True, help='World name (e.g., Behemoth)')
+@click.option('--limit', default=50, help='Number of top items to track (default: 50)')
+@click.pass_context
+def init_tracking(ctx, world, limit):
+    """Initialize tracking for top volume items on a world."""
+    logger.info(f"Executing 'init-tracking' command for {world} (limit: {limit})")
+    service = ctx.obj['SERVICE']
+    
+    MarketUI.show_init_tracking_header(world, limit)
+    
+    try:
+        # Get most recently updated items
+        with MarketUI.show_status("Fetching items..."):
+            pass
+        
+        with MarketUI.show_init_tracking_progress(limit) as progress:
+            task = progress.add_task("Analyzing items...", total=limit)
+            
+            # Initialize tracking and get results
+            top_items, total_found, items_with_sales = service.initialize_tracking(world, limit)
+            
+            # Update progress to complete
+            progress.update(task, completed=limit)
+        
+        if not top_items:
+            MarketUI.print_warning(f"No items with sales data found for {world}")
+            return
+        
+        MarketUI.show_init_tracking_results(world, top_items, ctx.obj['DB_PATH'])
+        
+    except Exception as e:
+        logger.error(f"Init tracking failed: {e}", exc_info=True)
+        MarketUI.exit_with_error(str(e))
+
+
+@cli.command()
+@click.option('--world', required=True, help='World name to update')
+@click.pass_context
+def update(ctx, world):
+    """Update market data for all tracked items on a world."""
+    logger.info(f"Executing 'update' command for {world}")
+    service = ctx.obj['SERVICE']
+    
+    # Get tracked items first
+    tracked_items = ctx.obj['DB'].get_tracked_items(world)
+    
+    if not tracked_items:
+        MarketUI.print_warning(f"No items being tracked for {world}. Run 'init-tracking' first.")
+        return
+    
+    MarketUI.show_update_header(world, len(tracked_items))
+    
+    with MarketUI.show_update_progress(len(tracked_items)) as progress:
+        task = progress.add_task("Fetching market data...", total=len(tracked_items))
+        
+        # Update items (service handles progress internally)
+        successful, failed, _ = service.update_tracked_items(world)
+        
+        # Update progress to complete
+        progress.update(task, completed=len(tracked_items))
+    
+    MarketUI.show_update_results(successful, failed)
+
+
+@cli.command()
+@click.option('--world', required=True, help='World name')
+@click.option('--limit', default=10, help='Number of top items to show')
+@click.pass_context
+def top(ctx, world, limit):
+    """Show top selling items by volume on a world."""
+    logger.info(f"Executing 'top' command for {world} (limit: {limit})")
+    service = ctx.obj['SERVICE']
+    
+    top_items = service.get_top_items(world, limit)
+    MarketUI.show_top_items(world, top_items, service.format_time_ago)
+
+
+@cli.command()
+@click.option('--world', required=True, help='World name')
+@click.option('--item-id', required=True, type=int, help='Item ID to report on')
+@click.option('--days', default=30, help='Number of days to show (default: 30)')
+@click.pass_context
+def report(ctx, world, item_id, days):
+    """Show detailed historical report for a specific item."""
+    logger.info(f"Executing 'report' command for item {item_id} on {world} ({days} days)")
+    service = ctx.obj['SERVICE']
+    
+    snapshots = service.get_item_report(world, item_id, days)
+    
+    if not snapshots:
+        MarketUI.print_warning(f"No data available for item {item_id} on {world}")
+        return
+    
+    MarketUI.show_item_report_header(world, item_id, len(snapshots))
+    MarketUI.show_item_report_table(snapshots)
+    
+    # Calculate and show trends
+    trends = service.calculate_trends(snapshots)
+    if trends:
+        MarketUI.show_trends(trends)
+
+
+@cli.command()
+@click.pass_context
+def list_tracked(ctx):
+    """List all tracked items across all worlds."""
+    logger.info("Executing 'list-tracked' command")
+    service = ctx.obj['SERVICE']
+    
+    by_world = service.get_all_tracked_items()
+    MarketUI.show_tracked_summary(by_world)
+
+
+if __name__ == "__main__":
+    cli(obj={})
