@@ -143,6 +143,17 @@ class UniversalisAPI:
         logger.info(f"Retrieved {len(result)} datacenters")
         return result
     
+    def get_worlds(self) -> List[Dict[str, Any]]:
+        """Fetch all available worlds from the API.
+        
+        Returns:
+            List of world dictionaries with 'id' and 'name' keys
+        """
+        logger.info("Fetching worlds list")
+        result = self._make_request(f"{self.base_url}/v2/worlds")
+        logger.info(f"Retrieved {len(result)} worlds")
+        return result
+    
     def get_most_recently_updated(self, world: str, entries: int = None) -> Dict[str, Any]:
         """Fetch most recently updated items for a world."""
         validate_world_name(world)
