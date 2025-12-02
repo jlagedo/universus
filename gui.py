@@ -72,17 +72,30 @@ def ensure_api_connection():
 
 
 def format_gil(amount: Optional[float]) -> str:
-    """Format gil amount with thousands separator."""
+    """Format gil amount using locale-style separators (e.g. 1.234.567)."""
     if amount is None:
         return "N/A"
-    return f"{int(amount):,}"
+    try:
+        amt = int(round(float(amount)))
+    except (TypeError, ValueError):
+        return "N/A"
+    # Use US formatting then swap to PT-BR style: thousands '.'
+    s = f"{amt:,}"  # e.g. 1,234,567
+    return s.replace(',', '.')
 
 
 def format_velocity(velocity: Optional[float]) -> str:
-    """Format sales velocity."""
+    """Format sales velocity with decimal comma (e.g. 12,34)."""
     if velocity is None:
         return "N/A"
-    return f"{velocity:.2f}"
+    try:
+        v = float(velocity)
+    except (TypeError, ValueError):
+        return "N/A"
+    s = f"{v:,.2f}"  # e.g. 1,234.56
+    # Swap separators: temporary marker for commas
+    s = s.replace(',', 'X').replace('.', ',').replace('X', '.')
+    return s
 
 
 def format_time_ago(timestamp_str: str) -> str:
@@ -271,7 +284,8 @@ class UniversusGUI:
                 }
                 
                 .q-btn--flat {
-                    background-color: transparent;
+                    ensure_api_connection()
+                    # Ensure we have a valid API connection
                     color: #e0e0e0;
                 }
                 
@@ -504,6 +518,20 @@ class UniversusGUI:
                     on_click=lambda: self.show_view('report')
                 ).classes('w-full justify-start').props('flat align=left')
                 
+                # Sell Volume by World Report
+                ui.button(
+                    'Sell Volume by World',
+                    icon='insights',
+                    on_click=lambda: self.show_view('sell_volume')
+                ).classes('w-full justify-start').props('flat align=left')
+
+                # Sell Volume Chart (Top 10 by Gil Volume)
+                ui.button(
+                    'Sell Volume Chart',
+                    icon='pie_chart',
+                    on_click=lambda: self.show_view('sell_volume_chart')
+                ).classes('w-full justify-start').props('flat align=left')
+                
                 ui.separator()
                 ui.label('Settings').classes(section_label_class)
                 
@@ -566,6 +594,10 @@ class UniversusGUI:
                 self.render_sync_items()
             elif view == 'tracked_worlds':
                 self.render_tracked_worlds()
+            elif view == 'sell_volume':
+                self.render_sell_volume_report()
+            elif view == 'sell_volume_chart':
+                self.render_sell_volume_chart()
     
     async def refresh_current_view(self):
         """Refresh the current view."""
@@ -1210,6 +1242,281 @@ class UniversusGUI:
                     ui.notify(f'Error: {ex}', type='negative')
 
             table.on('remove_world', on_remove_world)
+    
+    # ==================== SELL VOLUME BY WORLD REPORT ====================
+    def render_sell_volume_report(self):
+        """Render sell volume by world report based on tracked worlds and current prices."""
+        ui.label('Sell Volume by World').classes('text-2xl font-bold mb-4')
+        ui.label('Top items by HQ sales velocity for selected tracked world.').classes('text-gray-500 mb-4')
+        
+        # Get tracked worlds for selection
+        tracked = service.list_tracked_worlds()
+        if not tracked:
+            with ui.card().classes('w-full bg-yellow-50'):
+                ui.label('No tracked worlds configured.').classes('text-yellow-700')
+                ui.label('Add tracked worlds in Settings > Tracked Worlds first.').classes('text-sm text-yellow-600')
+            return
+        
+        # Build options for dropdown
+        world_options = {}
+        for w in tracked:
+            world_id = w.get('world_id')
+            world_name = w.get('world_name') or self.world_id_to_name.get(world_id, f"World {world_id}")
+            world_options[world_name] = world_id
+        
+        # Selection UI
+        with ui.card().classes('w-full max-w-xl'):
+            ui.label('Filter').classes('text-lg font-semibold mb-2')
+            
+            selected_world_name = list(world_options.keys())[0] if world_options else None
+            world_select = ui.select(
+                options=list(world_options.keys()),
+                value=selected_world_name,
+                label='Tracked World'
+            ).classes('w-full')
+            
+            limit_input = ui.number('Limit', value=100, min=1, max=500).classes('w-full')
+            
+            # Results container
+            report_container = ui.column().classes('w-full mt-4')
+            
+            def generate_report():
+                wname = world_select.value
+                if not wname or wname not in world_options:
+                    ui.notify('Please select a valid tracked world', type='warning')
+                    return
+                
+                wid = world_options[wname]
+                limit = int(limit_input.value)
+                
+                report_container.clear()
+                self.set_status(f'Generating report for {wname}...')
+                
+                try:
+                    # Execute query
+                    cursor = db.conn.cursor()
+                    cursor.execute("""
+                        SELECT 
+                            i.name,
+                            cp.hq_world_recent_price,
+                            cp.hq_world_avg_price,
+                            cp.hq_world_min_price,
+                            cp.hq_world_daily_velocity
+                        FROM marketable_items mi
+                        INNER JOIN items i ON mi.item_id = i.item_id
+                        INNER JOIN current_prices cp ON cp.item_id = i.item_id
+                        WHERE cp.tracked_world_id = ?
+                        ORDER BY cp.hq_world_daily_velocity DESC
+                        LIMIT ?
+                    """, (wid, limit))
+                    
+                    results = cursor.fetchall()
+                    
+                    with report_container:
+                        if not results:
+                            ui.label(f'No data available for {wname}. Run "Update Current Prices" CLI command first.').classes('text-yellow-600')
+                            return
+                        
+                        ui.label(f'Top {len(results)} items by HQ daily velocity on {wname}').classes('text-lg font-semibold mb-2')
+                        
+                        # Build table
+                        columns = [
+                            {'name': 'rank', 'label': 'Rank', 'field': 'rank', 'align': 'center'},
+                            {'name': 'item_name', 'label': 'Item Name', 'field': 'item_name', 'align': 'left'},
+                            {'name': 'hq_velocity', 'label': 'HQ Daily Velocity', 'field': 'hq_velocity', 'align': 'right'},
+                            {'name': 'hq_recent_price', 'label': 'HQ Recent Price', 'field': 'hq_recent_price', 'align': 'right'},
+                            {'name': 'hq_avg_price', 'label': 'HQ Avg Price', 'field': 'hq_avg_price', 'align': 'right'},
+                            {'name': 'hq_min_price', 'label': 'HQ Min Price', 'field': 'hq_min_price', 'align': 'right'},
+                            {'name': 'gil_volume', 'label': 'Gil Volume', 'field': 'gil_volume', 'align': 'right'},
+                        ]
+                        
+                        rows = []
+                        for idx, row in enumerate(results, start=1):
+                            # row mapping: 0=name,1=recent_price,2=avg_price,3=min_price,4=velocity
+                            recent_price = row[1] or 0
+                            avg_price = row[2] or 0
+                            min_price = row[3] or 0
+                            velocity = row[4] or 0
+                            price_for_volume = recent_price or avg_price or min_price
+                            gil_volume = (velocity or 0) * (price_for_volume or 0)
+                            rows.append({
+                                'rank': idx,
+                                'item_name': row[0] or 'Unknown',
+                                'hq_velocity': format_velocity(row[4]),
+                                'hq_recent_price': format_gil(row[1]),
+                                'hq_avg_price': format_gil(row[2]),
+                                'hq_min_price': format_gil(row[3]),
+                                'gil_volume': format_gil(gil_volume),
+                            })
+                        
+                        ui.table(columns=columns, rows=rows, row_key='rank', pagination={'rowsPerPage': 20}).classes('w-full')
+                        ui.label(f'Showing {len(results)} items').classes('text-sm text-gray-500 mt-2')
+                    
+                    self.set_status('Ready')
+                    
+                except Exception as e:
+                    with report_container:
+                        ui.label(f'Error: {e}').classes('text-red-600')
+                    self.set_status('Error')
+                    ui.notify(f'Error: {e}', type='negative')
+            
+            ui.button('Generate Report', icon='bar_chart', on_click=generate_report).props('color=primary').classes('mt-4')
+
+    # ==================== SELL VOLUME PIE CHART VIEW ====================
+    def render_sell_volume_chart(self):
+        """Render pie chart of top 10 items by gil volume for selected tracked world."""
+        ui.label('Sell Volume Chart').classes('text-2xl font-bold mb-4')
+        ui.label('Pie chart of top 10 items by HQ gil volume (velocity * price).').classes('text-gray-500 mb-4')
+
+        tracked = service.list_tracked_worlds()
+        if not tracked:
+            with ui.card().classes('w-full bg-yellow-50'):
+                ui.label('No tracked worlds configured.').classes('text-yellow-700')
+                ui.label('Add tracked worlds first to view chart.').classes('text-sm text-yellow-600')
+            return
+
+        world_options = {}
+        for w in tracked:
+            wid = w.get('world_id')
+            wname = w.get('world_name') or self.world_id_to_name.get(wid, f"World {wid}")
+            world_options[wname] = wid
+
+        with ui.card().classes('w-full max-w-xl'):
+            ui.label('Filter').classes('text-lg font-semibold mb-2')
+            selected_world_name = list(world_options.keys())[0] if world_options else None
+            world_select = ui.select(options=list(world_options.keys()), value=selected_world_name, label='Tracked World').classes('w-full')
+            ui.button('Generate Chart', icon='pie_chart', on_click=lambda: generate_chart()).props('color=primary').classes('mt-4')
+
+            chart_container = ui.column().classes('w-full mt-4')
+
+            def generate_chart():
+                chart_container.clear()
+                wname = world_select.value
+                if not wname:
+                    ui.notify('Select a tracked world', type='warning')
+                    return
+                wid = world_options.get(wname)
+                self.set_status(f'Building chart for {wname}...')
+                try:
+                    cursor = db.conn.cursor()
+                    cursor.execute("""
+                        SELECT 
+                            i.name,
+                            cp.hq_world_recent_price,
+                            cp.hq_world_avg_price,
+                            cp.hq_world_min_price,
+                            cp.hq_world_daily_velocity
+                        FROM marketable_items mi
+                        INNER JOIN items i ON mi.item_id = i.item_id
+                        INNER JOIN current_prices cp ON cp.item_id = i.item_id
+                        WHERE cp.tracked_world_id = ?
+                        ORDER BY cp.hq_world_daily_velocity DESC
+                        LIMIT 200
+                    """, (wid,))
+                    rows = cursor.fetchall()
+                    data_points = []
+                    for row in rows:
+                        name = row[0] or 'Unknown'
+                        recent = row[1] or 0
+                        avg_p = row[2] or 0
+                        min_p = row[3] or 0
+                        velocity = row[4] or 0
+                        price_for_volume = recent or avg_p or min_p
+                        gil_volume = (velocity or 0) * (price_for_volume or 0)
+                        if gil_volume > 0:
+                            data_points.append((name, gil_volume, velocity, price_for_volume))
+                    # Sort by gil volume and take top 10
+                    data_points.sort(key=lambda x: x[1], reverse=True)
+                    top10 = data_points[:10]
+                    if not top10:
+                        with chart_container:
+                            ui.label('No data available. Run price update first.').classes('text-yellow-600')
+                        self.set_status('Ready')
+                        return
+                    # Prepare ECharts option
+                    series_data = [
+                        {
+                            'name': name,
+                            'value': round(gv, 2),
+                            'tooltip': f"{name}: {format_gil(gv)} gil (Vel {format_velocity(vel)})"
+                        }
+                        for name, gv, vel, price in top10
+                    ]
+                    total_volume = sum(gv for _, gv, _, _ in top10)
+                    option = {
+                        'tooltip': {
+                            'trigger': 'item',
+                            'formatter': '{b}<br/>Gil Volume: {c}<br/>Share: {d}%'
+                        },
+                        'legend': {'top': 'bottom'},
+                        'series': [
+                            {
+                                'name': 'Gil Volume',
+                                'type': 'pie',
+                                'radius': '60%',
+                                'data': series_data,
+                                'emphasis': {
+                                    'itemStyle': {
+                                        'shadowBlur': 10,
+                                        'shadowOffsetX': 0,
+                                        'shadowColor': 'rgba(0, 0, 0, 0.5)'
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                    with chart_container:
+                        ui.label(f'Top 10 Gil Volume Items on {wname} (Total {format_gil(total_volume)} gil)').classes('text-lg font-semibold mb-2')
+                        labels = [d['name'] for d in series_data]
+                        values = [d['value'] for d in series_data]
+                        if hasattr(ui, 'echarts'):
+                            ui.echarts(option).classes('w-full h-96')
+                        elif hasattr(ui, 'plotly'):
+                            try:
+                                import plotly.graph_objects as go
+                                fig = go.Figure(data=[go.Pie(labels=labels, values=values)])
+                                fig.update_traces(textinfo='percent', hovertemplate='%{label}<br>Gil Volume: %{value:,}<br>%{percent}')
+                                fig.update_layout(margin=dict(l=10, r=10, t=10, b=10))
+                                ui.plotly(fig).classes('w-full h-96')
+                            except Exception as pe:
+                                ui.label(f'Plotly error: {pe}').classes('text-red-600')
+                        else:
+                            # Fallback: display proportional bar list without JS
+                            total = sum(values) or 1
+                            with ui.column().classes('w-full'):
+                                for name, val in zip(labels, values):
+                                    pct = (val / total) * 100
+                                    bar_width = pct
+                                    with ui.row().classes('items-center w-full'):
+                                        ui.label(name).classes('w-40 truncate')
+                                        ui.html(f'<div style="flex:1;background:#eee;height:16px;position:relative">\n'
+                                                f'<div style="background:#1f77b4;width:{bar_width}%;height:16px"></div>\n'
+                                                f'<span style="position:absolute;left:8px;top:-2px;font-size:11px">{format_gil(val)} gil ({pct:.1f}%)</span>\n'
+                                                f'</div>', sanitize=False).classes('w-full')
+                        ui.table(
+                            columns=[
+                                {'name': 'rank', 'label': 'Rank', 'field': 'rank', 'align': 'center'},
+                                {'name': 'item', 'label': 'Item', 'field': 'item', 'align': 'left'},
+                                {'name': 'gil_volume', 'label': 'Gil Volume', 'field': 'gil_volume', 'align': 'right'},
+                                {'name': 'velocity', 'label': 'Velocity', 'field': 'velocity', 'align': 'right'},
+                            ],
+                            rows=[
+                                {
+                                    'rank': idx + 1,
+                                    'item': name,
+                                    'gil_volume': format_gil(gv),
+                                    'velocity': format_velocity(vel)
+                                }
+                                for idx, (name, gv, vel, price) in enumerate(top10)
+                            ],
+                            row_key='rank'
+                        ).classes('w-full mt-4')
+                    self.set_status('Ready')
+                except Exception as e:
+                    with chart_container:
+                        ui.label(f'Error: {e}').classes('text-red-600')
+                    self.set_status('Error')
+                    ui.notify(f'Error: {e}', type='negative')
     
     async def initialize(self):
         """Initialize the GUI with data."""

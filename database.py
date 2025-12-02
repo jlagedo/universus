@@ -96,6 +96,55 @@ class MarketDatabase:
             )
         """)
         
+        # Table for current aggregated prices per tracked world
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS current_prices (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                tracked_world_id INTEGER NOT NULL,
+                item_id INTEGER NOT NULL,
+                fetched_at TIMESTAMP NOT NULL,
+                nq_world_min_price INTEGER,
+                nq_dc_min_price INTEGER,
+                nq_dc_min_world_id INTEGER,
+                nq_region_min_price INTEGER,
+                nq_region_min_world_id INTEGER,
+                nq_world_recent_price INTEGER,
+                nq_world_recent_timestamp INTEGER,
+                nq_dc_recent_price INTEGER,
+                nq_dc_recent_timestamp INTEGER,
+                nq_dc_recent_world_id INTEGER,
+                nq_region_recent_price INTEGER,
+                nq_region_recent_timestamp INTEGER,
+                nq_region_recent_world_id INTEGER,
+                nq_region_avg_price REAL,
+                nq_region_daily_velocity REAL,
+                hq_world_min_price INTEGER,
+                hq_dc_min_price INTEGER,
+                hq_dc_min_world_id INTEGER,
+                hq_region_min_price INTEGER,
+                hq_region_min_world_id INTEGER,
+                hq_world_recent_price INTEGER,
+                hq_world_recent_timestamp INTEGER,
+                hq_dc_recent_price INTEGER,
+                hq_dc_recent_timestamp INTEGER,
+                hq_dc_recent_world_id INTEGER,
+                hq_region_recent_price INTEGER,
+                hq_region_recent_timestamp INTEGER,
+                hq_region_recent_world_id INTEGER,
+                hq_world_avg_price REAL,
+                hq_dc_avg_price REAL,
+                hq_region_avg_price REAL,
+                hq_world_daily_velocity REAL,
+                hq_dc_daily_velocity REAL,
+                hq_region_daily_velocity REAL
+            )
+        """)
+        # Unique index for same-day entries
+        cursor.execute("""
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_current_prices_unique_day
+            ON current_prices(tracked_world_id, item_id, strftime('%Y-%m-%d', fetched_at))
+        """)
+        
         # Table for individual sales
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS sales_history (
@@ -335,6 +384,12 @@ class MarketDatabase:
         cursor.execute("SELECT COUNT(*) as count FROM items")
         return cursor.fetchone()['count']
     
+    def get_marketable_item_ids(self) -> List[int]:
+        """Get all marketable item IDs."""
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT item_id FROM marketable_items")
+        return [row[0] for row in cursor.fetchall()]
+    
     def get_tracked_items_count(self, world: str = None) -> int:
         """Get count of tracked items, optionally filtered by world."""
         cursor = self.conn.cursor()
@@ -400,6 +455,91 @@ class MarketDatabase:
         cursor = self.conn.cursor()
         cursor.execute("SELECT COUNT(*) as count FROM tracked_worlds")
         return cursor.fetchone()['count']
+    
+    def save_aggregated_prices(self, tracked_world_id: int, results: List[Dict]):
+        """Save aggregated prices results for a tracked world.
+        
+        Skips inserts that already exist for the same day due to UNIQUE constraint.
+        """
+        with self._lock:
+            cursor = self.conn.cursor()
+            now = datetime.now().isoformat(sep=' ')
+            for item in results:
+                item_id = item.get('itemId')
+                nq = item.get('nq', {})
+                hq = item.get('hq', {})
+                def get_nested(d, *keys):
+                    try:
+                        for k in keys:
+                            d = d.get(k, {})
+                        return d
+                    except AttributeError:
+                        return {}
+                cursor.execute(
+                    """
+                    INSERT OR IGNORE INTO current_prices (
+                        tracked_world_id, item_id, fetched_at,
+                        nq_world_min_price, nq_dc_min_price, nq_dc_min_world_id, nq_region_min_price, nq_region_min_world_id,
+                        nq_world_recent_price, nq_world_recent_timestamp,
+                        nq_dc_recent_price, nq_dc_recent_timestamp, nq_dc_recent_world_id,
+                        nq_region_recent_price, nq_region_recent_timestamp, nq_region_recent_world_id,
+                        nq_region_avg_price, nq_region_daily_velocity,
+                        hq_world_min_price, hq_dc_min_price, hq_dc_min_world_id, hq_region_min_price, hq_region_min_world_id,
+                        hq_world_recent_price, hq_world_recent_timestamp,
+                        hq_dc_recent_price, hq_dc_recent_timestamp, hq_dc_recent_world_id,
+                        hq_region_recent_price, hq_region_recent_timestamp, hq_region_recent_world_id,
+                        hq_world_avg_price, hq_dc_avg_price, hq_region_avg_price,
+                        hq_world_daily_velocity, hq_dc_daily_velocity, hq_region_daily_velocity
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        tracked_world_id, item_id, now,
+                        nq.get('minListing', {}).get('world', {}).get('price'),
+                        nq.get('minListing', {}).get('dc', {}).get('price'),
+                        nq.get('minListing', {}).get('dc', {}).get('worldId'),
+                        nq.get('minListing', {}).get('region', {}).get('price'),
+                        nq.get('minListing', {}).get('region', {}).get('worldId'),
+                        nq.get('recentPurchase', {}).get('world', {}).get('price'),
+                        nq.get('recentPurchase', {}).get('world', {}).get('timestamp'),
+                        nq.get('recentPurchase', {}).get('dc', {}).get('price'),
+                        nq.get('recentPurchase', {}).get('dc', {}).get('timestamp'),
+                        nq.get('recentPurchase', {}).get('dc', {}).get('worldId'),
+                        nq.get('recentPurchase', {}).get('region', {}).get('price'),
+                        nq.get('recentPurchase', {}).get('region', {}).get('timestamp'),
+                        nq.get('recentPurchase', {}).get('region', {}).get('worldId'),
+                        get_nested(nq, 'averageSalePrice', 'region').get('price'),
+                        get_nested(nq, 'dailySaleVelocity', 'region').get('quantity'),
+                        hq.get('minListing', {}).get('world', {}).get('price'),
+                        hq.get('minListing', {}).get('dc', {}).get('price'),
+                        hq.get('minListing', {}).get('dc', {}).get('worldId'),
+                        hq.get('minListing', {}).get('region', {}).get('price'),
+                        hq.get('minListing', {}).get('region', {}).get('worldId'),
+                        hq.get('recentPurchase', {}).get('world', {}).get('price'),
+                        hq.get('recentPurchase', {}).get('world', {}).get('timestamp'),
+                        hq.get('recentPurchase', {}).get('dc', {}).get('price'),
+                        hq.get('recentPurchase', {}).get('dc', {}).get('timestamp'),
+                        hq.get('recentPurchase', {}).get('dc', {}).get('worldId'),
+                        hq.get('recentPurchase', {}).get('region', {}).get('price'),
+                        hq.get('recentPurchase', {}).get('region', {}).get('timestamp'),
+                        hq.get('recentPurchase', {}).get('region', {}).get('worldId'),
+                        get_nested(hq, 'averageSalePrice', 'world').get('price'),
+                        get_nested(hq, 'averageSalePrice', 'dc').get('price'),
+                        get_nested(hq, 'averageSalePrice', 'region').get('price'),
+                        get_nested(hq, 'dailySaleVelocity', 'world').get('quantity'),
+                        get_nested(hq, 'dailySaleVelocity', 'dc').get('quantity'),
+                        get_nested(hq, 'dailySaleVelocity', 'region').get('quantity'),
+                    )
+                )
+            self.conn.commit()
+    
+    def get_items_updated_today(self, tracked_world_id: int) -> set:
+        """Return a set of item_ids already updated today for the tracked world."""
+        cursor = self.conn.cursor()
+        cursor.execute(
+            "SELECT item_id FROM current_prices WHERE tracked_world_id = ? AND date(fetched_at) = date('now')",
+            (tracked_world_id,)
+        )
+        return {row[0] for row in cursor.fetchall()}
     
     def sync_marketable_items(self, item_ids: List[int]) -> int:
         """Sync marketable item IDs to database.

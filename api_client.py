@@ -272,6 +272,26 @@ class UniversalisAPI:
             f"{self.base_url}/history/{world}/{item_id}",
             params={"entries": entries}
         )
+
+    def get_aggregated_prices(self, scope: str, item_ids: List[int]) -> Dict[str, Any]:
+        """Fetch aggregated prices for multiple items within a scope.
+        
+        Args:
+            scope: World/DC/Region name as required by Universalis (e.g., world name like 'Behemoth')
+            item_ids: List of item IDs (up to 100)
+        Returns:
+            JSON dict with 'results' array for each itemId
+        """
+        logger.info(f"Fetching aggregated prices for {len(item_ids)} items on {scope}")
+        ids_str = ",".join(str(i) for i in item_ids)
+        url = f"{self.base_url}/v2/aggregated/{scope}/{ids_str}"
+        return self._make_request(url)
+
+    async def get_aggregated_prices_async(self, scope: str, item_ids: List[int]) -> Dict[str, Any]:
+        """Async version: Fetch aggregated prices for multiple items within a scope."""
+        ids_str = ",".join(str(i) for i in item_ids)
+        url = f"{self.base_url}/v2/aggregated/{scope}/{ids_str}"
+        return await self._make_request_async(url)
     
     def fetch_teamcraft_items(self) -> Dict[str, Dict]:
         """Fetch item names from FFXIV Teamcraft data dump.

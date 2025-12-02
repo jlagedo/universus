@@ -322,5 +322,29 @@ def tracked_worlds_clear(ctx):
         MarketUI.exit_with_error(str(e))
 
 
+@cli.command(name='update-current-prices')
+@click.pass_context
+def update_current_prices(ctx):
+    """Update current aggregated prices for all marketable items on tracked worlds.
+    
+    - Reads marketable item IDs from `marketable_items` table
+    - Reads tracked worlds from `tracked_worlds` table
+    - Calls Universalis aggregated API in batches of 100 per world
+    - Stores results in `current_prices` table with timestamp and tracked world id
+    - Skips items already updated today per world
+    """
+    logger.info("Executing 'update-current-prices' command")
+    service = ctx.obj['SERVICE']
+    try:
+        with MarketUI.show_status("Updating aggregated prices (batched)..."):
+            summary = service.update_current_item_prices()
+        MarketUI.print_success(
+            f"Updated {summary['updated']:,} entries across {summary['worlds']} worlds (skipped {summary['skipped']:,}; total items {summary['items']:,})"
+        )
+    except Exception as e:
+        logger.error(f"Failed to update current prices: {e}")
+        MarketUI.exit_with_error(str(e))
+
+
 if __name__ == "__main__":
     cli(obj={})

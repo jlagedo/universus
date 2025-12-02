@@ -333,3 +333,53 @@ class MarketService:
     def clear_tracked_worlds(self):
         """Clear all tracked worlds from the database."""
         self.db.clear_tracked_worlds()
+
+    def update_current_item_prices(self) -> Dict[str, int]:
+        """Fetch aggregated prices for all marketable items across tracked worlds.
+        
+        - Gets all tracked worlds (id+name)
+        - Gets all marketable item IDs
+        - Skips items already updated today per world
+        - Queries Universalis aggregated API in batches of 100 per world
+        - Saves results to `current_prices`
+        Returns a summary dict with counts.
+        """
+        tracked_worlds = self.db.list_tracked_worlds()
+        if not tracked_worlds:
+            return {"worlds": 0, "items": 0, "updated": 0, "skipped": 0}
+        item_ids = self.db.get_marketable_item_ids()
+        if not item_ids:
+            return {"worlds": len(tracked_worlds), "items": 0, "updated": 0, "skipped": 0}
+        total_updated = 0
+        total_skipped = 0
+        for tw in tracked_worlds:
+            world_id = tw.get('world_id')
+            world_name = tw.get('world_name')
+            if not world_name:
+                # Resolve world name from API if missing
+                try:
+                    worlds = self.api.get_worlds()
+                    match = next((w for w in worlds if w.get('id') == world_id), None)
+                    world_name = match.get('name') if match else str(world_id)
+                except Exception:
+                    world_name = str(world_id)
+            updated_today = self.db.get_items_updated_today(world_id)
+            # Batch into groups of 100, skipping already updated ones
+            batch = []
+            for iid in item_ids:
+                if iid in updated_today:
+                    total_skipped += 1
+                    continue
+                batch.append(iid)
+                if len(batch) == 100:
+                    data = self.api.get_aggregated_prices(world_name, batch)
+                    results = data.get('results', [])
+                    self.db.save_aggregated_prices(world_id, results)
+                    total_updated += len(results)
+                    batch = []
+            if batch:
+                data = self.api.get_aggregated_prices(world_name, batch)
+                results = data.get('results', [])
+                self.db.save_aggregated_prices(world_id, results)
+                total_updated += len(results)
+        return {"worlds": len(tracked_worlds), "items": len(item_ids), "updated": total_updated, "skipped": total_skipped}
