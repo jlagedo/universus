@@ -73,7 +73,7 @@ class MarketUI:
     def show_init_tracking_header(world: str, limit: int):
         """Display header for init tracking operation."""
         console.print(f"[cyan]Initializing tracking for {world}...[/cyan]")
-        console.print(f"[dim]Rate limit: 2 requests/second (respecting API limits)[/dim]\n")
+        console.print(f"[dim]Rate limit: 20 requests/second (respecting API limits)[/dim]\n")
     
     @staticmethod
     def show_init_tracking_progress(total: int):
@@ -110,7 +110,7 @@ class MarketUI:
     def show_update_header(world: str, item_count: int):
         """Display header for update operation."""
         console.print(f"[cyan]Updating {item_count} items on {world}...[/cyan]")
-        console.print(f"[dim]Rate limit: 2 requests/second • This will take ~{item_count} seconds[/dim]\n")
+        console.print(f"[dim]Rate limit: 20 requests/second • This will take ~{item_count // 20 + 1} seconds[/dim]\n")
     
     @staticmethod
     def show_update_progress(total: int):

@@ -13,7 +13,7 @@ Universus is a Python application for tracking Final Fantasy XIV market prices w
 - **Testing**: pytest (98 tests, 67% coverage)
 - **Database**: SQLite with thread-safety
 - **GUI**: NiceGUI with async operations
-- **API**: Universalis API with rate limiting (2 req/sec)
+- **API**: Universalis API with rate limiting (20 req/s, token bucket)
 
 ## File Structure & Responsibilities
 

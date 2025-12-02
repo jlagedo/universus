@@ -10,7 +10,7 @@ A Python application for tracking Final Fantasy XIV market prices using the [Uni
 - 🔄 Automated data fetching with rate limiting
 - 🖥️ **CLI** with beautiful terminal UI (Rich formatting)
 - 🌐 **Web GUI** with responsive interface (NiceGUI)
-- ⚡ Respects API rate limits (2 requests/second)
+- ⚡ Respects API rate limits (20 requests/second, 80% of API capacity)
 - 🔧 Centralized configuration via `config.toml`
 
 ## Quick Start
@@ -93,7 +93,7 @@ This command:
 - Fetches the most recently updated items (high activity indicator)
 - Analyzes sale velocities for each item
 - Creates a local database to track these items
-- Respects API rate limits (2 requests/second)
+- Respects API rate limits (20 requests/second with burst support)
 
 ### 3. Update tracked items (run daily)
 
@@ -169,11 +169,12 @@ The application reads defaults from `config.toml`. You can override per-run usin
 
 ## API Rate Limiting
 
-This tool implements conservative rate limiting based on the Universalis API implementation:
+This tool implements respectful rate limiting based on official Universalis API limits:
 
-- **Rate**: 2 requests per second
-- **Reasoning**: API source code shows 100ms delays between requests
-- **Impact**: Updating 50 items takes ~25 seconds
+- **API Limit**: 25 requests/second sustained (50 req/s burst)
+- **Our Rate**: 20 requests/second (80% of limit for safety)
+- **Algorithm**: Token bucket with burst support
+- **Impact**: Updating 50 items takes ~2.5 seconds
 
 ## Database Structure
 

@@ -159,10 +159,10 @@ CREATE TABLE items (
 ## Key Features
 
 ### 1. Rate Limiting
-- Conservative 2 requests/second
-- Implemented using token bucket algorithm
-- Based on Universalis API source code analysis
-- Prevents API abuse
+- 20 requests/second (80% of 25 req/s API limit)
+- Token bucket algorithm with burst support (40 tokens)
+- Respects official Universalis API limits (25 req/s sustained, 50 req/s burst)
+- Provides safety margin while maximizing performance
 
 ### 2. Async Operations (GUI)
 - ThreadPoolExecutor with 3 workers
@@ -396,8 +396,8 @@ pip install -r requirements.txt
 
 ## Performance Metrics
 
-- **Init tracking (50 items)**: ~25 seconds (rate limited)
-- **Daily update (50 items)**: ~25 seconds (rate limited)
+- **Init tracking (50 items)**: ~2.5 seconds (rate limited at 20 req/s)
+- **Daily update (50 items)**: ~2.5 seconds (rate limited at 20 req/s)
 - **Database growth**: ~1MB per week per 50 items
 - **Query speed**: <10ms for most operations
 - **GUI response time**: <100ms (async operations)

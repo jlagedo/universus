@@ -45,29 +45,49 @@ def validate_world_name(world: str) -> str:
 
 
 class RateLimiter:
-    """Rate limiter to respect API limits."""
+    """Token bucket rate limiter to respect API limits.
     
-    def __init__(self, requests_per_second: float = None):
-        """Initialize rate limiter.
+    Universalis API limits: 25 req/s sustained, 50 req/s burst.
+    We use 20 req/s (80% of limit) for safety margin.
+    """
+    
+    def __init__(self, requests_per_second: float = None, burst_size: int = None):
+        """Initialize token bucket rate limiter.
         
-        Conservative limit of 2 requests/second based on API implementation
-        showing 100ms delays between requests.
+        Args:
+            requests_per_second: Sustained rate limit (default 20 req/s)
+            burst_size: Maximum burst capacity (default 40 tokens)
         """
         if requests_per_second is None:
-            requests_per_second = config.get('api', 'rate_limit', 2.0)
-        self.min_interval = 1.0 / requests_per_second
-        self.last_request_time = 0.0
-        logger.debug(f"Rate limiter initialized: {requests_per_second} req/sec (interval: {self.min_interval:.3f}s)")
+            requests_per_second = config.get('api', 'rate_limit', 20.0)
+        if burst_size is None:
+            burst_size = config.get('api', 'burst_size', 40)
+        
+        self.rate = requests_per_second
+        self.burst_size = burst_size
+        self.tokens = float(burst_size)  # Start with full bucket
+        self.last_refill_time = time.time()
+        
+        logger.debug(f"Rate limiter initialized: {requests_per_second} req/sec, burst: {burst_size}")
     
     def wait(self):
-        """Wait if necessary to respect rate limit."""
+        """Wait if necessary to respect rate limit using token bucket algorithm."""
+        # Refill tokens based on time elapsed
         current_time = time.time()
-        time_since_last_request = current_time - self.last_request_time
-        if time_since_last_request < self.min_interval:
-            sleep_time = self.min_interval - time_since_last_request
-            logger.debug(f"Rate limiting: sleeping for {sleep_time:.3f}s")
+        time_elapsed = current_time - self.last_refill_time
+        self.tokens = min(self.burst_size, self.tokens + time_elapsed * self.rate)
+        self.last_refill_time = current_time
+        
+        # If no tokens available, wait for one token to be generated
+        if self.tokens < 1.0:
+            sleep_time = (1.0 - self.tokens) / self.rate
+            logger.debug(f"Rate limiting: sleeping for {sleep_time:.3f}s (tokens: {self.tokens:.2f})")
             time.sleep(sleep_time)
-        self.last_request_time = time.time()
+            self.tokens = 1.0
+            self.last_refill_time = time.time()
+        
+        # Consume one token
+        self.tokens -= 1.0
 
 
 class UniversalisAPI:

@@ -149,7 +149,7 @@ def render_update(state, db, dark_mode: bool = False):
         
         estimated_time = tracked_count // 2
         ui.label(f'Estimated time: ~{estimated_time} seconds').classes('text-sm text-gray-500')
-        ui.label('Rate limit: 2 requests/second (respecting API limits)').classes('text-sm text-gray-400')
+        ui.label('Rate limit: 20 requests/second (80% of API capacity)').classes('text-sm text-gray-400')
         
         progress_container = ui.column().classes('w-full mt-4')
     

@@ -12,7 +12,12 @@ base_url = "https://universalis.app/api"
 timeout = 10
 
 # Rate limiting (requests per second)
-rate_limit = 2.0
+# Universalis API allows 25 req/s sustained (50 req/s burst)
+# We use 20 req/s (80% of limit) for safety margin
+rate_limit = 20.0
+
+# Burst capacity (maximum tokens in bucket)
+burst_size = 40
 
 # Maximum items per query
 max_items_per_query = 200

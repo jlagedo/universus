@@ -44,15 +44,17 @@ class TestRateLimiter:
     
     def test_initialization(self):
         """Test rate limiter initialization."""
-        limiter = RateLimiter(requests_per_second=5.0)
-        assert limiter.min_interval == 0.2  # 1/5
-        assert limiter.last_request_time == 0.0
+        limiter = RateLimiter(requests_per_second=5.0, burst_size=10)
+        assert limiter.rate == 5.0
+        assert limiter.burst_size == 10
+        assert limiter.tokens == 10.0  # Start with full bucket
     
     def test_default_rate_limit(self):
         """Test default rate limit is applied."""
         limiter = RateLimiter()
-        # Default rate limit from config is 2.0 req/sec -> interval 0.5s
-        assert abs(limiter.min_interval - 0.5) < 1e-6
+        # Default rate limit from config is 20.0 req/sec
+        assert limiter.rate == 20.0
+        assert limiter.burst_size == 40
     
     def test_first_request_no_wait(self):
         """Test that first request doesn't wait."""
@@ -64,27 +66,29 @@ class TestRateLimiter:
     
     def test_rate_limiting_enforced(self):
         """Test that rate limiting actually delays requests."""
-        limiter = RateLimiter(requests_per_second=10.0)  # 0.1s between requests
+        limiter = RateLimiter(requests_per_second=10.0, burst_size=1)  # Start with 1 token only
         
-        limiter.wait()  # First request
+        limiter.wait()  # First request consumes the token
         start_time = time.time()
-        limiter.wait()  # Second request should wait
+        limiter.wait()  # Second request should wait for token refill
         elapsed = time.time() - start_time
         
-        assert elapsed >= 0.09  # Should wait ~0.1s
+        assert elapsed >= 0.09  # Should wait ~0.1s (1 token / 10 tokens/sec)
         assert elapsed < 0.15   # But not too long
     
     def test_multiple_requests_rate_limited(self):
         """Test multiple requests are properly rate limited."""
-        limiter = RateLimiter(requests_per_second=20.0)  # 0.05s between requests
+        limiter = RateLimiter(requests_per_second=20.0, burst_size=2)  # Start with 2 tokens
         
         start_time = time.time()
         for _ in range(3):
             limiter.wait()
         elapsed = time.time() - start_time
         
-        # Should take at least 0.1s (2 intervals for 3 requests)
-        assert elapsed >= 0.09
+        # First 2 requests use burst tokens (instant), 3rd waits for 1 token
+        # Wait time: 1 token / 20 tokens/sec = 0.05s
+        assert elapsed >= 0.04
+        assert elapsed < 0.1
 
 
 class TestUniversalisAPI:
@@ -287,13 +291,17 @@ class TestUniversalisAPI:
         mock_response.json.return_value = {}
         mock_session.get.return_value = mock_response
         
+        # Replace rate limiter with slower one for testing
+        api.rate_limiter = RateLimiter(requests_per_second=5.0, burst_size=1)
+        
         start_time = time.time()
         api._make_request("https://test.com/api1")
         api._make_request("https://test.com/api2")
         elapsed = time.time() - start_time
         
-        # Should take at least 0.5s due to rate limiting (2 req/sec)
-        assert elapsed >= 0.49
+        # With 5 req/s and 1 token: first instant, second waits 0.2s
+        assert elapsed >= 0.18
+        assert elapsed < 0.3
     
     def test_retry_on_timeout(self, api, mock_session):
         """Test that timeouts trigger retry."""
