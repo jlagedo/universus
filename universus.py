@@ -65,11 +65,19 @@ def cli(ctx, db_path, verbose, config_path):
 def cleanup(ctx, result, **kwargs):
     """Cleanup resources after command execution."""
     logger.debug("Starting cleanup of resources")
-    if 'DB' in ctx.obj and ctx.obj['DB']:
-        ctx.obj['DB'].close()
-    if 'API' in ctx.obj and ctx.obj['API']:
-        ctx.obj['API'].close()
-    logger.info("Cleanup complete")
+    try:
+        if 'DB' in ctx.obj and ctx.obj['DB']:
+            ctx.obj['DB'].close()
+    except Exception as e:
+        logger.error(f"Error closing database: {e}")
+    finally:
+        try:
+            if 'API' in ctx.obj and ctx.obj['API']:
+                ctx.obj['API'].close()
+        except Exception as e:
+            logger.error(f"Error closing API client: {e}")
+        finally:
+            logger.info("Cleanup complete")
 
 
 @cli.command()

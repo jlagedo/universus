@@ -71,23 +71,39 @@ def main():
     # Initialize services
     db, api, service, config = init_services()
     
-    # Create GUI instance
-    gui_app = UniversusGUI(db, api, service, config)
-    
-    @ui.page('/')
-    async def main_page():
-        """Main page entry point."""
-        gui_app.build()
-        await gui_app.initialize()
-    
-    # Run the application
-    ui.run(
-        title='Universus - FFXIV Market Tracker',
-        port=8080,
-        reload=False,
-        show=True,
-        favicon='🌍'
-    )
+    try:
+        # Create GUI instance
+        gui_app = UniversusGUI(db, api, service, config)
+        
+        @ui.page('/')
+        async def main_page():
+            """Main page entry point."""
+            gui_app.build()
+            await gui_app.initialize()
+        
+        # Run the application
+        ui.run(
+            title='Universus - FFXIV Market Tracker',
+            port=8080,
+            reload=False,
+            show=True,
+            favicon='🌍'
+        )
+    finally:
+        # Ensure resources are cleaned up
+        try:
+            if db:
+                db.close()
+                logger.info("Database closed")
+        except Exception as e:
+            logger.error(f"Error closing database: {e}")
+        finally:
+            try:
+                if api:
+                    api.close()
+                    logger.info("API client closed")
+            except Exception as e:
+                logger.error(f"Error closing API client: {e}")
 
 
 if __name__ == "__main__":

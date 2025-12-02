@@ -90,8 +90,8 @@ class UniversusGUI:
             if self.api:
                 try:
                     self.api.close()
-                except:
-                    pass
+                except Exception as close_error:
+                    logger.debug(f"Error closing API client: {close_error}")
             # Recreate API and service
             from api_client import UniversalisAPI
             from service import MarketService

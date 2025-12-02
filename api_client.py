@@ -135,8 +135,8 @@ class UniversalisAPI:
                     # Recreate session on connection errors
                     try:
                         self.session.close()
-                    except:
-                        pass
+                    except Exception as close_error:
+                        logger.debug(f"Error closing session: {close_error}")
                     self.session = requests.Session()
                     self.session.headers.update({
                         "User-Agent": f"Universus-CLI/{API_VERSION}"
