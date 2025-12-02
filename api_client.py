@@ -313,3 +313,25 @@ class UniversalisAPI:
         logger.info("Fetching items from FFXIV Teamcraft (async)")
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(_executor, self.fetch_teamcraft_items)
+    
+    def get_marketable_items(self) -> List[int]:
+        """Fetch all marketable item IDs from the Universalis API.
+        
+        Returns:
+            List of marketable item IDs
+        """
+        logger.info("Fetching marketable items from Universalis API")
+        result = self._make_request(f"{self.base_url}/v2/marketable")
+        logger.info(f"Retrieved {len(result)} marketable items")
+        return result
+    
+    async def get_marketable_items_async(self) -> List[int]:
+        """Async version: Fetch all marketable item IDs from the Universalis API.
+        
+        Returns:
+            List of marketable item IDs
+        """
+        logger.info("Fetching marketable items from Universalis API (async)")
+        result = await self._make_request_async(f"{self.base_url}/v2/marketable")
+        logger.info(f"Retrieved {len(result)} marketable items")
+        return result

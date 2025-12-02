@@ -244,3 +244,31 @@ class MarketService:
             _executor,
             self.sync_items_database
         )
+    
+    def sync_marketable_items(self) -> int:
+        """Sync marketable item IDs from Universalis API to local database.
+        
+        This will clear existing marketable items and download fresh data from the API.
+        
+        Returns:
+            Number of items synced
+        """
+        logger.info("Starting marketable items sync")
+        item_ids = self.api.get_marketable_items()
+        count = self.db.sync_marketable_items(item_ids)
+        logger.info(f"Marketable items sync complete: {count} items")
+        return count
+    
+    async def sync_marketable_items_async(self) -> int:
+        """Async version: Sync marketable item IDs from Universalis API.
+        
+        Non-blocking version that runs in executor.
+        
+        Returns:
+            Number of items synced
+        """
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(
+            _executor,
+            self.sync_marketable_items
+        )

@@ -231,5 +231,27 @@ def sync_items(ctx):
         MarketUI.exit_with_error(f"Failed to sync items: {str(e)}")
 
 
+@cli.command()
+@click.pass_context
+def sync_marketable(ctx):
+    """Sync marketable items from Universalis API.
+    
+    This command downloads all marketable item IDs from the Universalis API
+    and stores them in the local database. Any existing marketable items data
+    will be cleared first.
+    """
+    logger.info("Executing 'sync-marketable' command")
+    service = ctx.obj['SERVICE']
+    
+    try:
+        with MarketUI.show_status("Downloading marketable items from Universalis API..."):
+            count = service.sync_marketable_items()
+        
+        MarketUI.print_success(f"Successfully synced {count:,} marketable items to local database")
+    except Exception as e:
+        logger.error(f"Failed to sync marketable items: {e}")
+        MarketUI.exit_with_error(f"Failed to sync marketable items: {str(e)}")
+
+
 if __name__ == "__main__":
     cli(obj={})

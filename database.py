@@ -79,6 +79,14 @@ class MarketDatabase:
             )
         """)
         
+        # Table for marketable items
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS marketable_items (
+                item_id INTEGER PRIMARY KEY,
+                last_synced TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
         # Table for individual sales
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS sales_history (
@@ -328,6 +336,46 @@ class MarketDatabase:
             )
         else:
             cursor.execute("SELECT COUNT(*) as count FROM tracked_items")
+        return cursor.fetchone()['count']
+    
+    def sync_marketable_items(self, item_ids: List[int]) -> int:
+        """Sync marketable item IDs to database.
+        
+        Args:
+            item_ids: List of marketable item IDs
+            
+        Returns:
+            Number of items synced
+        """
+        logger.info(f"Syncing {len(item_ids)} marketable items to database")
+        with self._lock:
+            cursor = self.conn.cursor()
+            
+            # Clear existing marketable items
+            logger.debug("Clearing existing marketable_items table")
+            cursor.execute("DELETE FROM marketable_items")
+            
+            # Bulk insert all marketable items
+            count = 0
+            for item_id in item_ids:
+                try:
+                    cursor.execute(
+                        "INSERT INTO marketable_items (item_id) VALUES (?)",
+                        (item_id,)
+                    )
+                    count += 1
+                except Exception as e:
+                    logger.warning(f"Failed to insert marketable item {item_id}: {e}")
+                    continue
+            
+            self.conn.commit()
+        logger.info(f"Successfully synced {count} marketable items")
+        return count
+    
+    def get_marketable_items_count(self) -> int:
+        """Get total count of marketable items in database."""
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT COUNT(*) as count FROM marketable_items")
         return cursor.fetchone()['count']
     
     def close(self):
