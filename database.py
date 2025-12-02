@@ -96,6 +96,26 @@ class MarketDatabase:
             )
         """)
         
+        # Table for cached datacenters
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS cached_datacenters (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL UNIQUE,
+                region TEXT NOT NULL,
+                worlds TEXT NOT NULL,
+                last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
+        # Table for cached worlds
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS cached_worlds (
+                world_id INTEGER PRIMARY KEY,
+                world_name TEXT NOT NULL,
+                last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
         # Table for current aggregated prices per tracked world
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS current_prices (
@@ -581,6 +601,285 @@ class MarketDatabase:
         cursor.execute("SELECT COUNT(*) as count FROM marketable_items")
         return cursor.fetchone()['count']
     
+    def save_datacenters_cache(self, datacenters: List[Dict]) -> int:
+        """Save datacenters to cache.
+        
+        Args:
+            datacenters: List of datacenter dicts with 'name', 'region', 'worlds' keys
+            
+        Returns:
+            Number of datacenters cached
+        """
+        logger.info(f"Caching {len(datacenters)} datacenters")
+        with self._lock:
+            cursor = self.conn.cursor()
+            
+            # Clear existing cache
+            cursor.execute("DELETE FROM cached_datacenters")
+            
+            # Insert all datacenters
+            count = 0
+            for dc in datacenters:
+                try:
+                    # Convert worlds list to JSON string
+                    import json
+                    worlds_json = json.dumps(dc.get('worlds', []))
+                    
+                    cursor.execute(
+                        """INSERT INTO cached_datacenters (name, region, worlds, last_updated)
+                           VALUES (?, ?, ?, CURRENT_TIMESTAMP)""",
+                        (dc.get('name'), dc.get('region'), worlds_json)
+                    )
+                    count += 1
+                except Exception as e:
+                    logger.warning(f"Failed to cache datacenter {dc.get('name')}: {e}")
+                    continue
+            
+            self.conn.commit()
+        logger.info(f"Successfully cached {count} datacenters")
+        return count
+    
+    def get_datacenters_cache(self, max_age_hours: int = 24) -> Optional[List[Dict]]:
+        """Get cached datacenters if not stale.
+        
+        Args:
+            max_age_hours: Maximum age of cache in hours (default 24)
+            
+        Returns:
+            List of datacenters or None if cache is stale/empty
+        """
+        cursor = self.conn.cursor()
+        
+        # Check if cache exists and is fresh
+        cursor.execute(
+            """SELECT name, region, worlds, last_updated 
+               FROM cached_datacenters 
+               WHERE datetime(last_updated) > datetime('now', '-' || ? || ' hours')""",
+            (max_age_hours,)
+        )
+        
+        rows = cursor.fetchall()
+        if not rows:
+            logger.debug("Datacenter cache is empty or stale")
+            return None
+        
+        # Convert back to list of dicts
+        import json
+        datacenters = []
+        for row in rows:
+            datacenters.append({
+                'name': row['name'],
+                'region': row['region'],
+                'worlds': json.loads(row['worlds'])
+            })
+        
+        logger.info(f"Retrieved {len(datacenters)} datacenters from cache")
+        return datacenters
+    
+    def save_worlds_cache(self, worlds: List[Dict]) -> int:
+        """Save worlds to cache.
+        
+        Args:
+            worlds: List of world dicts with 'id' and 'name' keys
+            
+        Returns:
+            Number of worlds cached
+        """
+        logger.info(f"Caching {len(worlds)} worlds")
+        with self._lock:
+            cursor = self.conn.cursor()
+            
+            # Clear existing cache
+            cursor.execute("DELETE FROM cached_worlds")
+            
+            # Insert all worlds
+            count = 0
+            for world in worlds:
+                try:
+                    cursor.execute(
+                        """INSERT INTO cached_worlds (world_id, world_name, last_updated)
+                           VALUES (?, ?, CURRENT_TIMESTAMP)""",
+                        (world.get('id'), world.get('name'))
+                    )
+                    count += 1
+                except Exception as e:
+                    logger.warning(f"Failed to cache world {world.get('name')}: {e}")
+                    continue
+            
+            self.conn.commit()
+        logger.info(f"Successfully cached {count} worlds")
+        return count
+    
+    def get_worlds_cache(self, max_age_hours: int = 24) -> Optional[List[Dict]]:
+        """Get cached worlds if not stale.
+        
+        Args:
+            max_age_hours: Maximum age of cache in hours (default 24)
+            
+        Returns:
+            List of worlds or None if cache is stale/empty
+        """
+        cursor = self.conn.cursor()
+        
+        # Check if cache exists and is fresh
+        cursor.execute(
+            """SELECT world_id, world_name, last_updated 
+               FROM cached_worlds 
+               WHERE datetime(last_updated) > datetime('now', '-' || ? || ' hours')""",
+            (max_age_hours,)
+        )
+        
+        rows = cursor.fetchall()
+        if not rows:
+            logger.debug("Worlds cache is empty or stale")
+            return None
+        
+        # Convert back to list of dicts
+        worlds = []
+        for row in rows:
+            worlds.append({
+                'id': row['world_id'],
+                'name': row['world_name']
+            })
+        
+        logger.info(f"Retrieved {len(worlds)} worlds from cache")
+        return worlds
+    
+    def get_cache_status(self) -> Dict[str, any]:
+        """Get status of all caches.
+        
+        Returns:
+            Dict with cache counts and last update times
+        """
+        cursor = self.conn.cursor()
+        
+        # Datacenter cache status
+        cursor.execute("SELECT COUNT(*) as count, MAX(last_updated) as last_updated FROM cached_datacenters")
+        dc_row = cursor.fetchone()
+        
+        # Worlds cache status
+        cursor.execute("SELECT COUNT(*) as count, MAX(last_updated) as last_updated FROM cached_worlds")
+        worlds_row = cursor.fetchone()
+        
+        return {
+            'datacenters': {
+                'count': dc_row['count'],
+                'last_updated': dc_row['last_updated']
+            },
+            'worlds': {
+                'count': worlds_row['count'],
+                'last_updated': worlds_row['last_updated']
+            }
+        }
+    
+    def get_current_prices_count(self, world_id: int = None) -> int:
+        """Get count of current prices, optionally filtered by world.
+        
+        Args:
+            world_id: Optional world ID to filter by
+            
+        Returns:
+            Count of current price records
+        """
+        cursor = self.conn.cursor()
+        if world_id:
+            cursor.execute(
+                "SELECT COUNT(*) as count FROM current_prices WHERE tracked_world_id = ?",
+                (world_id,)
+            )
+        else:
+            cursor.execute("SELECT COUNT(*) as count FROM current_prices")
+        return cursor.fetchone()['count']
+    
+    def get_latest_current_price_timestamp(self, world_id: int = None) -> str:
+        """Get the most recent fetched_at timestamp from current_prices.
+        
+        Args:
+            world_id: Optional world ID to filter by
+            
+        Returns:
+            ISO timestamp string or None if no data
+        """
+        cursor = self.conn.cursor()
+        if world_id:
+            cursor.execute(
+                "SELECT MAX(fetched_at) as latest FROM current_prices WHERE tracked_world_id = ?",
+                (world_id,)
+            )
+        else:
+            cursor.execute("SELECT MAX(fetched_at) as latest FROM current_prices")
+        row = cursor.fetchone()
+        return row['latest'] if row else None
+    
+    def get_top_items_by_hq_velocity(self, world_id: int, limit: int = 10) -> List[Dict]:
+        """Get top items by HQ daily sale velocity for a world.
+        
+        Args:
+            world_id: World ID to query
+            limit: Maximum number of items to return
+            
+        Returns:
+            List of items with velocity and price data, ordered by HQ velocity desc
+        """
+        cursor = self.conn.cursor()
+        cursor.execute(
+            """
+            SELECT 
+                cp.item_id,
+                i.name as item_name,
+                cp.hq_world_daily_velocity,
+                cp.hq_world_avg_price,
+                cp.nq_region_daily_velocity,
+                cp.nq_region_avg_price,
+                cp.fetched_at,
+                (cp.hq_world_daily_velocity * cp.hq_world_avg_price) as hq_gil_volume,
+                (cp.nq_region_daily_velocity * cp.nq_region_avg_price) as nq_gil_volume
+            FROM current_prices cp
+            LEFT JOIN items i ON cp.item_id = i.item_id
+            WHERE cp.tracked_world_id = ?
+            AND date(cp.fetched_at) = date('now')
+            AND cp.hq_world_daily_velocity IS NOT NULL
+            ORDER BY cp.hq_world_daily_velocity DESC
+            LIMIT ?
+            """,
+            (world_id, limit)
+        )
+        return [dict(row) for row in cursor.fetchall()]
+    
+    def get_datacenter_gil_volume(self, world_id: int) -> Dict[str, any]:
+        """Get total gil volume for a datacenter (sum of all items for today).
+        
+        Args:
+            world_id: World ID to query
+            
+        Returns:
+            Dict with hq_volume, nq_volume, total_volume, item_count
+        """
+        cursor = self.conn.cursor()
+        cursor.execute(
+            """
+            SELECT 
+                SUM(hq_world_daily_velocity * hq_world_avg_price) as hq_volume,
+                SUM(nq_region_daily_velocity * nq_region_avg_price) as nq_volume,
+                COUNT(*) as item_count
+            FROM current_prices
+            WHERE tracked_world_id = ?
+            AND date(fetched_at) = date('now')
+            """,
+            (world_id,)
+        )
+        row = cursor.fetchone()
+        if row:
+            hq = row['hq_volume'] or 0
+            nq = row['nq_volume'] or 0
+            return {
+                'hq_volume': hq,
+                'nq_volume': nq,
+                'total_volume': hq + nq,
+                'item_count': row['item_count']
+            }
+        return {'hq_volume': 0, 'nq_volume': 0, 'total_volume': 0, 'item_count': 0}
+
     def close(self):
         """Close database connection."""
         if self.conn:

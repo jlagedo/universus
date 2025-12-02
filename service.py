@@ -30,13 +30,80 @@ class MarketService:
         self.db = db
         self.api = api
     
-    def get_datacenters(self) -> List[Dict]:
-        """Fetch and return all datacenters."""
-        return self.api.get_datacenters()
+    def get_datacenters(self, use_cache: bool = True, max_age_hours: int = 24) -> List[Dict]:
+        """Fetch and return all datacenters, using cache when possible.
+        
+        Args:
+            use_cache: Whether to use cached data (default True)
+            max_age_hours: Maximum age of cache in hours (default 24)
+            
+        Returns:
+            List of datacenter dictionaries
+        """
+        if use_cache:
+            cached = self.db.get_datacenters_cache(max_age_hours)
+            if cached:
+                logger.info("Using cached datacenters")
+                return cached
+        
+        # Fetch from API and cache
+        logger.info("Fetching datacenters from API")
+        datacenters = self.api.get_datacenters()
+        self.db.save_datacenters_cache(datacenters)
+        return datacenters
     
-    def get_available_worlds(self) -> List[Dict]:
-        """Fetch and return all available worlds (id and name)."""
-        return self.api.get_worlds()
+    def get_available_worlds(self, use_cache: bool = True, max_age_hours: int = 24) -> List[Dict]:
+        """Fetch and return all available worlds, using cache when possible.
+        
+        Args:
+            use_cache: Whether to use cached data (default True)
+            max_age_hours: Maximum age of cache in hours (default 24)
+            
+        Returns:
+            List of world dictionaries with 'id' and 'name' keys
+        """
+        if use_cache:
+            cached = self.db.get_worlds_cache(max_age_hours)
+            if cached:
+                logger.info("Using cached worlds")
+                return cached
+        
+        # Fetch from API and cache
+        logger.info("Fetching worlds from API")
+        worlds = self.api.get_worlds()
+        self.db.save_worlds_cache(worlds)
+        return worlds
+    
+    def refresh_cache(self) -> Dict[str, int]:
+        """Manually refresh all caches.
+        
+        Returns:
+            Dict with counts of cached items
+        """
+        logger.info("Manually refreshing caches")
+        
+        datacenters = self.api.get_datacenters()
+        dc_count = self.db.save_datacenters_cache(datacenters)
+        
+        worlds = self.api.get_worlds()
+        worlds_count = self.db.save_worlds_cache(worlds)
+        
+        return {
+            'datacenters': dc_count,
+            'worlds': worlds_count
+        }
+    
+    async def refresh_cache_async(self) -> Dict[str, int]:
+        """Async version: Manually refresh all caches.
+        
+        Returns:
+            Dict with counts of cached items
+        """
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(
+            _executor,
+            self.refresh_cache
+        )
     
     def initialize_tracking(self, world: str, limit: int) -> Tuple[List[Dict], int, int]:
         """

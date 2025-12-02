@@ -4,6 +4,9 @@
 # Path to the SQLite database file
 default_path = "market_data.db"
 
+# Cache settings
+cache_max_age_hours = 24
+
 [api]
 # Universalis API base URL
 base_url = "https://universalis.app/api"

@@ -330,6 +330,36 @@ def tracked_worlds_clear(ctx):
         MarketUI.exit_with_error(str(e))
 
 
+@cli.command(name='refresh-cache')
+@click.pass_context
+def refresh_cache(ctx):
+    """Refresh cached datacenter and world data.
+    
+    This command updates the local cache of datacenter and world information
+    from the Universalis API. The cache is automatically used and refreshed
+    daily, but this command allows manual refresh if needed.
+    """
+    logger.info("Executing 'refresh-cache' command")
+    service = ctx.obj['SERVICE']
+    
+    try:
+        with MarketUI.show_status("Refreshing datacenter and world cache..."):
+            result = service.refresh_cache()
+        
+        MarketUI.print_success(
+            f"Cache refreshed: {result['datacenters']} datacenters, {result['worlds']} worlds"
+        )
+        
+        # Show cache status
+        db = ctx.obj['DB']
+        status = db.get_cache_status()
+        MarketUI.print_info(f"Datacenters cached: {status['datacenters']['count']} (last updated: {status['datacenters']['last_updated']})")
+        MarketUI.print_info(f"Worlds cached: {status['worlds']['count']} (last updated: {status['worlds']['last_updated']})")
+    except Exception as e:
+        logger.error(f"Failed to refresh cache: {e}")
+        MarketUI.exit_with_error(str(e))
+
+
 @cli.command(name='update-current-prices')
 @click.pass_context
 def update_current_prices(ctx):

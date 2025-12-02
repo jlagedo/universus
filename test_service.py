@@ -32,18 +32,43 @@ class TestMarketService:
         assert service.db == mock_db
         assert service.api == mock_api
     
-    def test_get_datacenters(self, service, mock_api):
-        """Test getting datacenters."""
+    def test_get_datacenters(self, service, mock_db, mock_api):
+        """Test getting datacenters with cache."""
         expected_dcs = [
             {'name': 'Crystal', 'region': 'NA'},
             {'name': 'Light', 'region': 'EU'}
         ]
+        
+        # Test with empty cache (should fetch from API)
+        mock_db.get_datacenters_cache.return_value = None
         mock_api.get_datacenters.return_value = expected_dcs
         
         result = service.get_datacenters()
         
         assert result == expected_dcs
         mock_api.get_datacenters.assert_called_once()
+        mock_db.save_datacenters_cache.assert_called_once_with(expected_dcs)
+        
+        # Test with valid cache (should use cache, not API)
+        mock_db.get_datacenters_cache.return_value = expected_dcs
+        mock_api.reset_mock()
+        mock_db.reset_mock()
+        
+        result = service.get_datacenters()
+        
+        assert result == expected_dcs
+        mock_api.get_datacenters.assert_not_called()
+        mock_db.save_datacenters_cache.assert_not_called()
+        
+        # Test with use_cache=False (should always fetch from API)
+        mock_api.reset_mock()
+        mock_db.reset_mock()
+        
+        result = service.get_datacenters(use_cache=False)
+        
+        assert result == expected_dcs
+        mock_api.get_datacenters.assert_called_once()
+        mock_db.save_datacenters_cache.assert_called_once()
     
     def test_initialize_tracking_success(self, service, mock_db, mock_api):
         """Test successful tracking initialization."""
@@ -333,3 +358,38 @@ class TestMarketService:
         """Test formatting None timestamp."""
         result = service.format_time_ago(None)
         assert result == "Unknown"
+    
+    def test_get_available_worlds_with_cache(self, service, mock_db, mock_api):
+        """Test getting worlds with cache."""
+        expected_worlds = [
+            {'id': 73, 'name': 'Adamantoise'},
+            {'id': 79, 'name': 'Cactuar'}
+        ]
+        
+        # Test with empty cache
+        mock_db.get_worlds_cache.return_value = None
+        mock_api.get_worlds.return_value = expected_worlds
+        
+        result = service.get_available_worlds()
+        
+        assert result == expected_worlds
+        mock_api.get_worlds.assert_called_once()
+        mock_db.save_worlds_cache.assert_called_once_with(expected_worlds)
+    
+    def test_refresh_cache(self, service, mock_db, mock_api):
+        """Test manual cache refresh."""
+        datacenters = [{'name': 'Aether', 'region': 'NA'}]
+        worlds = [{'id': 73, 'name': 'Adamantoise'}]
+        
+        mock_api.get_datacenters.return_value = datacenters
+        mock_api.get_worlds.return_value = worlds
+        mock_db.save_datacenters_cache.return_value = 1
+        mock_db.save_worlds_cache.return_value = 1
+        
+        result = service.refresh_cache()
+        
+        assert result == {'datacenters': 1, 'worlds': 1}
+        mock_api.get_datacenters.assert_called_once()
+        mock_api.get_worlds.assert_called_once()
+        mock_db.save_datacenters_cache.assert_called_once()
+        mock_db.save_worlds_cache.assert_called_once()

@@ -7,6 +7,27 @@ from ..utils.formatters import format_time_ago
 from ..components.cards import stat_card
 
 
+def format_number(num):
+    """Format number with thousand separators."""
+    if num is None:
+        return 'N/A'
+    return f'{int(num):,}'
+
+
+def format_gil(amount):
+    """Format gil amount with separators."""
+    if amount is None or amount == 0:
+        return '0 gil'
+    return f'{int(amount):,} gil'
+
+
+def format_decimal(num, decimals=2):
+    """Format decimal number with thousand separators."""
+    if num is None:
+        return 'N/A'
+    return f'{num:,.{decimals}f}'
+
+
 def render(state, db, dark_mode: bool = False):
     """Render the dashboard view.
     
@@ -21,43 +42,83 @@ def render(state, db, dark_mode: bool = False):
     
     ui.label('Dashboard').classes(title_class)
     
-    if not state.selected_world:
-        ui.label('Please select a world from the header dropdown.').classes(label_class)
-        return None, None, None
+    # Get world_id for selected world
+    world_id = None
+    if state.selected_world and state.world_id_to_name:
+        # Reverse lookup to get world_id from name
+        for wid, wname in state.world_id_to_name.items():
+            if wname == state.selected_world:
+                world_id = wid
+                break
     
-    # Stats cards
+    # Stats cards - NEW TRACKERS
     with ui.row().classes('w-full gap-4 mb-6'):
-        tracked_items = db.get_tracked_items(state.selected_world) if state.selected_world else []
-        tracked_count = len(tracked_items)
-        items_synced = db.get_items_count()
+        # Tracked Worlds count
+        tracked_worlds_count = db.get_tracked_worlds_count()
+        stat_card('Tracked Worlds', format_number(tracked_worlds_count), 'public', 'blue', dark_mode)
         
-        stat_card('Tracked Items', str(tracked_count), 'visibility', 'blue', dark_mode)
-        stat_card('Items Database', f'{items_synced:,}', 'inventory_2', 'green', dark_mode)
-        stat_card('Selected World', state.selected_world or 'None', 'public', 'purple', dark_mode)
-        stat_card('Status', 'Online', 'wifi', 'teal', dark_mode)
+        # Current Prices count (for selected world if available)
+        if world_id:
+            current_prices_count = db.get_current_prices_count(world_id)
+            stat_card('Current Prices', format_number(current_prices_count), 'receipt_long', 'green', dark_mode)
+        else:
+            current_prices_count = db.get_current_prices_count()
+            stat_card('Current Prices', format_number(current_prices_count), 'receipt_long', 'green', dark_mode)
+        
+        # Latest Price Timestamp
+        if world_id:
+            latest_timestamp = db.get_latest_current_price_timestamp(world_id)
+        else:
+            latest_timestamp = db.get_latest_current_price_timestamp()
+        
+        timestamp_display = format_time_ago(latest_timestamp) if latest_timestamp else 'No data'
+        stat_card('Latest Update', timestamp_display, 'schedule', 'purple', dark_mode)
+        
+        # Marketable Items Database
+        marketable_count = db.get_marketable_items_count()
+        stat_card('Marketable Items', format_number(marketable_count), 'inventory_2', 'teal', dark_mode)
     
-    # Quick actions
-    ui.label('Quick Actions').classes(actions_class)
-    quick_actions_row = ui.row().classes('gap-4 mb-6')
+    # World-specific data section
+    if state.selected_world and world_id:
+        # Datacenter Gil Volume Widget
+        ui.label(f'{state.selected_world} Market Analysis').classes(actions_class + ' mt-6')
+        
+        volume_data = db.get_datacenter_gil_volume(world_id)
+        
+        with ui.row().classes('w-full gap-4 mb-6'):
+            stat_card('HQ Gil Volume', format_gil(volume_data['hq_volume']), 'trending_up', 'amber', dark_mode)
+            stat_card('NQ Gil Volume', format_gil(volume_data['nq_volume']), 'trending_down', 'orange', dark_mode)
+            stat_card('Total Gil Volume', format_gil(volume_data['total_volume']), 'paid', 'red', dark_mode)
+        
+        # Top 10 items by HQ velocity
+        ui.label('Top 10 Items by HQ Velocity').classes(actions_class + ' mt-6')
+        
+        top_items = db.get_top_items_by_hq_velocity(world_id, limit=10)
+        
+        if top_items:
+            columns = [
+                {'name': 'rank', 'label': 'Rank', 'field': 'rank', 'align': 'center'},
+                {'name': 'item_name', 'label': 'Item', 'field': 'item_name', 'align': 'left'},
+                {'name': 'hq_velocity', 'label': 'HQ Velocity', 'field': 'hq_velocity', 'align': 'right'},
+                {'name': 'hq_avg_price', 'label': 'HQ Avg Price', 'field': 'hq_avg_price', 'align': 'right'},
+                {'name': 'hq_volume', 'label': 'HQ Gil Volume', 'field': 'hq_volume', 'align': 'right'},
+                {'name': 'nq_velocity', 'label': 'NQ Velocity', 'field': 'nq_velocity', 'align': 'right'},
+            ]
+            rows = [
+                {
+                    'rank': idx + 1,
+                    'item_name': item.get('item_name') or f"Item #{item['item_id']}",
+                    'hq_velocity': format_decimal(item['hq_world_daily_velocity'], 1),
+                    'hq_avg_price': format_gil(item['hq_world_avg_price']),
+                    'hq_volume': format_gil(item['hq_gil_volume']),
+                    'nq_velocity': format_decimal(item['nq_region_daily_velocity'], 1) if item['nq_region_daily_velocity'] else 'N/A',
+                }
+                for idx, item in enumerate(top_items)
+            ]
+            ui.table(columns=columns, rows=rows, row_key='rank').classes('w-full')
+        else:
+            ui.label('No price data available. Run "Update Market Data" to fetch current prices.').classes(label_class)
+    else:
+        ui.label('Please select a world from the header dropdown to view market analysis.').classes(label_class)
     
-    # Recent tracked items preview
-    if tracked_items:
-        ui.label('Recently Updated Items').classes('text-xl font-semibold mb-2')
-        columns = [
-            {'name': 'item_id', 'label': 'Item ID', 'field': 'item_id', 'align': 'left'},
-            {'name': 'item_name', 'label': 'Name', 'field': 'item_name', 'align': 'left'},
-            {'name': 'world', 'label': 'World', 'field': 'world', 'align': 'left'},
-            {'name': 'last_updated', 'label': 'Last Updated', 'field': 'last_updated', 'align': 'right'},
-        ]
-        rows = [
-            {
-                'item_id': item['item_id'],
-                'item_name': item.get('item_name') or f"Item #{item['item_id']}",
-                'world': item['world'],
-                'last_updated': format_time_ago(item.get('last_updated', ''))
-            }
-            for item in tracked_items[:10]
-        ]
-        ui.table(columns=columns, rows=rows, row_key='item_id').classes('w-full')
-    
-    return quick_actions_row, tracked_items, None
+    return None, None, None

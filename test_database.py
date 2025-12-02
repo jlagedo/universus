@@ -299,3 +299,205 @@ class TestMarketDatabase:
         
         assert behemoth_count == 2
         assert excalibur_count == 1
+    
+    def test_datacenters_cache(self, db):
+        """Test datacenter caching."""
+        datacenters = [
+            {'name': 'Aether', 'region': 'NA', 'worlds': [73, 79, 54]},
+            {'name': 'Primal', 'region': 'NA', 'worlds': [35, 55, 64]}
+        ]
+        
+        # Save to cache
+        count = db.save_datacenters_cache(datacenters)
+        assert count == 2
+        
+        # Retrieve from cache
+        cached = db.get_datacenters_cache(max_age_hours=24)
+        assert cached is not None
+        assert len(cached) == 2
+        assert cached[0]['name'] == 'Aether'
+        assert cached[0]['region'] == 'NA'
+        assert cached[0]['worlds'] == [73, 79, 54]
+        assert cached[1]['name'] == 'Primal'
+    
+    def test_datacenters_cache_stale(self, db):
+        """Test that stale cache returns None."""
+        datacenters = [{'name': 'Aether', 'region': 'NA', 'worlds': [73]}]
+        db.save_datacenters_cache(datacenters)
+        
+        # Try to get with 0 max age (should be stale)
+        cached = db.get_datacenters_cache(max_age_hours=0)
+        assert cached is None
+    
+    def test_worlds_cache(self, db):
+        """Test world caching."""
+        worlds = [
+            {'id': 73, 'name': 'Adamantoise'},
+            {'id': 79, 'name': 'Cactuar'},
+            {'id': 54, 'name': 'Faerie'}
+        ]
+        
+        # Save to cache
+        count = db.save_worlds_cache(worlds)
+        assert count == 3
+        
+        # Retrieve from cache
+        cached = db.get_worlds_cache(max_age_hours=24)
+        assert cached is not None
+        assert len(cached) == 3
+        
+        # Check all worlds are present (order may vary)
+        cached_ids = {w['id'] for w in cached}
+        cached_names = {w['name'] for w in cached}
+        assert 73 in cached_ids
+        assert 79 in cached_ids
+        assert 54 in cached_ids
+        assert 'Adamantoise' in cached_names
+        assert 'Cactuar' in cached_names
+        assert 'Faerie' in cached_names
+    
+    def test_worlds_cache_stale(self, db):
+        """Test that stale world cache returns None."""
+        worlds = [{'id': 73, 'name': 'Adamantoise'}]
+        db.save_worlds_cache(worlds)
+        
+        # Try to get with 0 max age (should be stale)
+        cached = db.get_worlds_cache(max_age_hours=0)
+        assert cached is None
+    
+    def test_cache_status(self, db):
+        """Test getting cache status."""
+        # Initially empty
+        status = db.get_cache_status()
+        assert status['datacenters']['count'] == 0
+        assert status['worlds']['count'] == 0
+        
+        # Add some data
+        datacenters = [{'name': 'Aether', 'region': 'NA', 'worlds': [73]}]
+        worlds = [{'id': 73, 'name': 'Adamantoise'}]
+        
+        db.save_datacenters_cache(datacenters)
+        db.save_worlds_cache(worlds)
+        
+        # Check status
+        status = db.get_cache_status()
+        assert status['datacenters']['count'] == 1
+        assert status['worlds']['count'] == 1
+        assert status['datacenters']['last_updated'] is not None
+        assert status['worlds']['last_updated'] is not None
+    
+    def test_get_current_prices_count(self, db):
+        """Test counting current prices."""
+        # Add tracked world
+        db.add_tracked_world(73, 'Adamantoise')
+        
+        # Initially should be 0
+        assert db.get_current_prices_count() == 0
+        assert db.get_current_prices_count(73) == 0
+        
+        # Add some price data
+        results = [
+            {'itemId': 5, 'hq': {'dailySaleVelocity': {'world': {'quantity': 10.5}}, 
+                                 'averageSalePrice': {'world': {'price': 1000}}}},
+            {'itemId': 6, 'hq': {'dailySaleVelocity': {'world': {'quantity': 5.2}}, 
+                                 'averageSalePrice': {'world': {'price': 2000}}}}
+        ]
+        db.save_aggregated_prices(73, results)
+        
+        # Check counts
+        assert db.get_current_prices_count() == 2
+        assert db.get_current_prices_count(73) == 2
+        assert db.get_current_prices_count(999) == 0
+    
+    def test_get_latest_current_price_timestamp(self, db):
+        """Test getting latest price timestamp."""
+        # Add tracked world
+        db.add_tracked_world(73, 'Adamantoise')
+        
+        # Initially should be None
+        assert db.get_latest_current_price_timestamp() is None
+        assert db.get_latest_current_price_timestamp(73) is None
+        
+        # Add price data
+        results = [{'itemId': 5, 'hq': {}}]
+        db.save_aggregated_prices(73, results)
+        
+        # Should have a timestamp
+        timestamp = db.get_latest_current_price_timestamp()
+        assert timestamp is not None
+        assert db.get_latest_current_price_timestamp(73) is not None
+    
+    def test_get_top_items_by_hq_velocity(self, db):
+        """Test getting top items by HQ velocity."""
+        # Add tracked world
+        db.add_tracked_world(73, 'Adamantoise')
+        
+        # Add items to the items table manually
+        cursor = db.conn.cursor()
+        cursor.execute("INSERT OR IGNORE INTO items (item_id, name) VALUES (?, ?)", (5, 'High Velocity Item'))
+        cursor.execute("INSERT OR IGNORE INTO items (item_id, name) VALUES (?, ?)", (6, 'Low Velocity Item'))
+        cursor.execute("INSERT OR IGNORE INTO items (item_id, name) VALUES (?, ?)", (7, 'Medium Velocity Item'))
+        db.conn.commit()
+        
+        # Add price data with different velocities
+        results = [
+            {'itemId': 5, 'hq': {'dailySaleVelocity': {'world': {'quantity': 100.5}}, 
+                                 'averageSalePrice': {'world': {'price': 5000}}}},
+            {'itemId': 6, 'hq': {'dailySaleVelocity': {'world': {'quantity': 5.2}}, 
+                                 'averageSalePrice': {'world': {'price': 2000}}}},
+            {'itemId': 7, 'hq': {'dailySaleVelocity': {'world': {'quantity': 50.0}}, 
+                                 'averageSalePrice': {'world': {'price': 3000}}}}
+        ]
+        db.save_aggregated_prices(73, results)
+        
+        # Get top 2 items
+        top_items = db.get_top_items_by_hq_velocity(73, limit=2)
+        
+        assert len(top_items) == 2
+        # Should be ordered by velocity descending
+        assert top_items[0]['item_id'] == 5
+        assert top_items[0]['hq_world_daily_velocity'] == 100.5
+        assert top_items[1]['item_id'] == 7
+        assert top_items[1]['hq_world_daily_velocity'] == 50.0
+        
+        # Check calculated gil volume
+        assert top_items[0]['hq_gil_volume'] == 100.5 * 5000
+        assert top_items[1]['hq_gil_volume'] == 50.0 * 3000
+    
+    def test_get_datacenter_gil_volume(self, db):
+        """Test getting datacenter gil volume."""
+        # Add tracked world
+        db.add_tracked_world(73, 'Adamantoise')
+        
+        # Initially should be zeros
+        volume = db.get_datacenter_gil_volume(73)
+        assert volume['hq_volume'] == 0
+        assert volume['nq_volume'] == 0
+        assert volume['total_volume'] == 0
+        assert volume['item_count'] == 0
+        
+        # Add price data - note that NQ only has region-level data in the schema
+        results = [
+            {'itemId': 5, 
+             'hq': {'dailySaleVelocity': {'world': {'quantity': 10.0}}, 
+                    'averageSalePrice': {'world': {'price': 1000}}},
+             'nq': {'dailySaleVelocity': {'region': {'quantity': 20.0}}, 
+                    'averageSalePrice': {'region': {'price': 500}}}},
+            {'itemId': 6, 
+             'hq': {'dailySaleVelocity': {'world': {'quantity': 5.0}}, 
+                    'averageSalePrice': {'world': {'price': 2000}}},
+             'nq': {'dailySaleVelocity': {'region': {'quantity': 15.0}}, 
+                    'averageSalePrice': {'region': {'price': 800}}}}
+        ]
+        db.save_aggregated_prices(73, results)
+        
+        # Check volumes
+        volume = db.get_datacenter_gil_volume(73)
+        
+        # HQ: (10*1000) + (5*2000) = 20,000
+        assert volume['hq_volume'] == 20000
+        # NQ: (20*500) + (15*800) = 22,000
+        assert volume['nq_volume'] == 22000
+        # Total: 42,000
+        assert volume['total_volume'] == 42000
+        assert volume['item_count'] == 2
