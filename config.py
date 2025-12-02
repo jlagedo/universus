@@ -112,6 +112,11 @@ class Config:
     def logging_config(self) -> Dict[str, Any]:
         """Get logging configuration section."""
         return self._config.get("logging", {})
+    
+    @property
+    def gui(self) -> Dict[str, Any]:
+        """Get GUI configuration section."""
+        return self._config.get("gui", {})
 
 
 # Global config instance

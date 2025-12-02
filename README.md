@@ -1,6 +1,6 @@
 # Universus
 
-A Python CLI tool for tracking Final Fantasy XIV market prices using the [Universalis API](https://universalis.app/). Build a local historical database to monitor the most traded items and track price trends over time.
+A Python application for tracking Final Fantasy XIV market prices using the [Universalis API](https://universalis.app/). Build a local historical database to monitor the most traded items and track price trends over time.
 
 ## Features
 
@@ -8,11 +8,14 @@ A Python CLI tool for tracking Final Fantasy XIV market prices using the [Univer
 - 💾 Local SQLite database for historical data storage
 - 📈 Daily snapshots of market data and price trends
 - 🔄 Automated data fetching with rate limiting
-- 🎨 Beautiful terminal UI with rich formatting
+- 🖥️ **CLI** with beautiful terminal UI (Rich formatting)
+- 🌐 **Web GUI** with responsive interface (NiceGUI)
 - ⚡ Respects API rate limits (2 requests/second)
- - 🔧 Centralized configuration via `config.toml`
+- 🔧 Centralized configuration via `config.toml`
 
-## Installation
+## Quick Start
+
+### Installation
 
 1. Clone or download this repository
 2. Install dependencies:
@@ -21,7 +24,22 @@ A Python CLI tool for tracking Final Fantasy XIV market prices using the [Univer
 pip install -r requirements.txt
 ```
 
-3. (Optional) Create a config file:
+### Running the Application
+
+**Web GUI** (Recommended for beginners):
+```bash
+python run_gui.py
+```
+Then open http://localhost:8080 in your browser.
+
+**CLI** (For automation and scripting):
+```bash
+python universus.py --help
+```
+
+### Configuration
+
+(Optional) Create a config file:
 
 ```toml
 # config.toml
@@ -49,7 +67,7 @@ format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 date_format = "%Y-%m-%d %H:%M:%S"
 ```
 
-## Usage
+## CLI Usage
 
 ### 1. List all datacenters
 
@@ -165,8 +183,16 @@ The local SQLite database (`market_data.db`) contains:
 - **daily_snapshots**: Daily market data snapshots
 - **sales_history**: Individual sale transactions
 
-## Example Workflow for Behemoth
+## Example Workflow
 
+### Using the GUI
+1. Run `python run_gui.py`
+2. Select your datacenter and world
+3. Click "Initialize Tracking" to start monitoring items
+4. Use "Update Market Data" daily to refresh data
+5. View reports and statistics in the dashboard
+
+### Using the CLI
 ```bash
 # 1. Initialize tracking (one-time setup)
 python universus.py init-tracking --world Behemoth --limit 50
@@ -181,81 +207,48 @@ python universus.py top --world Behemoth
 python universus.py report --world Behemoth --item-id 36112 --days 30
 ```
 
-## Project Structure
+## Documentation
 
-```
-universus/
-├── universus.py          # Main CLI application & command orchestration
-├── database.py           # Database layer (SQLite operations)
-├── api_client.py         # API client & rate limiting
-├── config.py             # Loads config from TOML
-├── service.py            # Business logic layer
-├── ui.py                 # Presentation layer (Rich UI)
-├── market_data.db        # SQLite database (created on first run)
-├── requirements.txt      # Python dependencies
-├── README.md             # This file
-├── QUICK_REFERENCE.md    # Command cheat sheet
-├── IMPLEMENTATION.md     # Technical documentation
-├── LOGGING.md            # Logging documentation
-└── ARCHITECTURE.md       # Architecture & design patterns
-```
+- **[README.md](README.md)** (this file) - User guide and quick start
+- **[PROJECT.md](PROJECT.md)** - Comprehensive project documentation (architecture, testing, development)
+- **[LLM_INSTRUCTIONS.md](LLM_INSTRUCTIONS.md)** - Instructions for AI assistants working with the code
 
-### Architecture
+## For Developers
 
-Universus follows a **layered architecture** with clear separation of concerns:
+### Testing
 
-- **CLI Layer** (`universus.py`) - Command routing and orchestration
-- **Presentation Layer** (`ui.py`) - Rich terminal UI and formatting
-- **Business Logic** (`service.py`) - Market operations and calculations
-- **Data Access** (`database.py`) - SQLite persistence
-- **API Client** (`api_client.py`) - HTTP communication with rate limiting
-
-See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed design documentation.
-
-## Testing
-
-Universus includes a comprehensive test suite with 98 tests covering all layers:
-
+Run the comprehensive test suite:
 ```bash
-# Install test dependencies
-pip install pytest pytest-cov pytest-mock
-
-# Run all tests
 pytest
-
-# Run with coverage
-pytest --cov=. --cov-report=html
-
-# Use the test runner
+# or
 python run_tests.py --coverage --verbose
 ```
 
-See [TESTING.md](TESTING.md) for detailed testing documentation.
+**Test Coverage**: 98 tests, 67% overall coverage
 
-**Test Coverage:**
-- Database Layer: 100%
-- API Client: 100%
-- Service Layer: 99%
-- UI Layer: 98%
- - Items Sync: 99%
+### Architecture
+
+Universus follows a layered architecture with clear separation of concerns:
+- **CLI/GUI Layer** - User interfaces
+- **Presentation Layer** - Terminal formatting
+- **Business Logic** - Market operations
+- **Data Access** - Database and API communication
+
+See **[PROJECT.md](PROJECT.md)** for detailed technical documentation.
 
 ## Requirements
 
-- Python 3.7+
-- click
-- requests
-- rich
-- sqlite3 (built-in)
- - tomli (for Python < 3.11)
+- **Python 3.7+**
+- Dependencies listed in `requirements.txt`
 
-### Testing Requirements
-- pytest>=7.0.0
-- pytest-cov>=4.0.0
-- pytest-mock>=3.10.0
+All dependencies install automatically with:
+```bash
+pip install -r requirements.txt
+```
 
-## API Documentation
+## About the API
 
-This CLI uses the [Universalis API](https://docs.universalis.app/). 
+This application uses the [Universalis API](https://docs.universalis.app/) with respectful rate limiting (2 requests/second). 
 
 ## Database File
 

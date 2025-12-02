@@ -4,6 +4,7 @@ Database layer for market data storage and retrieval.
 
 import sqlite3
 import logging
+import threading
 from datetime import datetime, timedelta
 from typing import Optional, List, Dict
 
@@ -23,12 +24,15 @@ class MarketDatabase:
             db_path = config.get('database', 'default_path', 'market_data.db')
         self.db_path = db_path
         self.conn = None
+        self._lock = threading.Lock()  # Thread-safe lock for database operations
         self._init_database()
     
     def _init_database(self):
         """Initialize database schema."""
         logger.info(f"Initializing database at {self.db_path}")
-        self.conn = sqlite3.connect(self.db_path)
+        # check_same_thread=False allows connection to be used across threads
+        # This is safe with SQLite's default locking mechanism
+        self.conn = sqlite3.connect(self.db_path, check_same_thread=False, timeout=30.0)
         self.conn.row_factory = sqlite3.Row
         # Enable foreign key enforcement
         self.conn.execute("PRAGMA foreign_keys = ON")
@@ -102,12 +106,13 @@ class MarketDatabase:
     def add_tracked_item(self, item_id: int, world: str):
         """Add an item to tracking list."""
         logger.debug(f"Adding item {item_id} to tracking list for {world}")
-        cursor = self.conn.cursor()
-        cursor.execute("""
-            INSERT OR IGNORE INTO tracked_items (item_id, world)
-            VALUES (?, ?)
-        """, (item_id, world))
-        self.conn.commit()
+        with self._lock:
+            cursor = self.conn.cursor()
+            cursor.execute("""
+                INSERT OR IGNORE INTO tracked_items (item_id, world)
+                VALUES (?, ?)
+            """, (item_id, world))
+            self.conn.commit()
         logger.debug(f"Item {item_id} added successfully")
     
     def get_tracked_items(self, world: Optional[str] = None) -> List[Dict]:
@@ -141,72 +146,74 @@ class MarketDatabase:
     def save_snapshot(self, item_id: int, world: str, data: Dict):
         """Save a daily snapshot of market data."""
         logger.debug(f"Saving snapshot for item {item_id} on {world}")
-        cursor = self.conn.cursor()
-        today = datetime.now().date().isoformat()  # Convert to ISO format string
-        
-        cursor.execute("""
-            INSERT OR REPLACE INTO daily_snapshots (
-                item_id, world, snapshot_date, average_price, min_price, max_price,
-                sale_velocity, nq_sale_velocity, hq_sale_velocity, total_listings,
-                last_upload_time
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (
-            item_id, world, today,
-            data.get('averagePrice'),
-            data.get('minPrice'),
-            data.get('maxPrice'),
-            data.get('regularSaleVelocity'),
-            data.get('nqSaleVelocity'),
-            data.get('hqSaleVelocity'),
-            len(data.get('listings', [])),
-            data.get('lastUploadTime')
-        ))
-        
-        # Update last_updated timestamp
-        cursor.execute("""
-            UPDATE tracked_items SET last_updated = CURRENT_TIMESTAMP
-            WHERE item_id = ? AND world = ?
-        """, (item_id, world))
-        
-        self.conn.commit()
+        with self._lock:
+            cursor = self.conn.cursor()
+            today = datetime.now().date().isoformat()  # Convert to ISO format string
+            
+            cursor.execute("""
+                INSERT OR REPLACE INTO daily_snapshots (
+                    item_id, world, snapshot_date, average_price, min_price, max_price,
+                    sale_velocity, nq_sale_velocity, hq_sale_velocity, total_listings,
+                    last_upload_time
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                item_id, world, today,
+                data.get('averagePrice'),
+                data.get('minPrice'),
+                data.get('maxPrice'),
+                data.get('regularSaleVelocity'),
+                data.get('nqSaleVelocity'),
+                data.get('hqSaleVelocity'),
+                len(data.get('listings', [])),
+                data.get('lastUploadTime')
+            ))
+            
+            # Update last_updated timestamp
+            cursor.execute("""
+                UPDATE tracked_items SET last_updated = CURRENT_TIMESTAMP
+                WHERE item_id = ? AND world = ?
+            """, (item_id, world))
+            
+            self.conn.commit()
         logger.debug(f"Snapshot saved: velocity={data.get('regularSaleVelocity')}, price={data.get('averagePrice')}")
     
     def save_sales(self, item_id: int, world: str, entries: List[Dict]):
         """Save sales history entries."""
         logger.debug(f"Saving {len(entries)} sales entries for item {item_id} on {world}")
-        cursor = self.conn.cursor()
-        
-        # Get existing sale keys to filter duplicates in memory
-        cursor.execute("""
-            SELECT sale_time, price_per_unit FROM sales_history
-            WHERE item_id = ? AND world = ?
-        """, (item_id, world))
-        existing_keys = {(row[0], row[1]) for row in cursor.fetchall()}
-        
-        # Filter new entries and prepare for bulk insert
-        new_entries_data = []
-        for entry in entries:
-            sale_key = (entry.get('timestamp'), entry.get('pricePerUnit'))
-            if sale_key not in existing_keys:
-                new_entries_data.append((
-                    item_id, world,
-                    entry.get('timestamp'),
-                    entry.get('pricePerUnit'),
-                    entry.get('quantity'),
-                    entry.get('hq', False),
-                    entry.get('buyerName')
-                ))
-        
-        # Bulk insert new entries
-        if new_entries_data:
-            cursor.executemany("""
-                INSERT INTO sales_history (
-                    item_id, world, sale_time, price_per_unit, quantity, is_hq, buyer_name
-                ) VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, new_entries_data)
-        
-        self.conn.commit()
-        logger.debug(f"Saved {len(new_entries_data)} new sales entries (skipped {len(entries) - len(new_entries_data)} duplicates)")
+        with self._lock:
+            cursor = self.conn.cursor()
+            
+            # Get existing sale keys to filter duplicates in memory
+            cursor.execute("""
+                SELECT sale_time, price_per_unit FROM sales_history
+                WHERE item_id = ? AND world = ?
+            """, (item_id, world))
+            existing_keys = {(row[0], row[1]) for row in cursor.fetchall()}
+            
+            # Filter new entries and prepare for bulk insert
+            new_entries_data = []
+            for entry in entries:
+                sale_key = (entry.get('timestamp'), entry.get('pricePerUnit'))
+                if sale_key not in existing_keys:
+                    new_entries_data.append((
+                        item_id, world,
+                        entry.get('timestamp'),
+                        entry.get('pricePerUnit'),
+                        entry.get('quantity'),
+                        entry.get('hq', False),
+                        entry.get('buyerName')
+                    ))
+            
+            # Bulk insert new entries
+            if new_entries_data:
+                cursor.executemany("""
+                    INSERT INTO sales_history (
+                        item_id, world, sale_time, price_per_unit, quantity, is_hq, buyer_name
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """, new_entries_data)
+            
+            self.conn.commit()
+        logger.debug(f"Saved {len(new_entries_data) if 'new_entries_data' in locals() else 0} new sales entries")
     
     def get_snapshots(self, item_id: int, world: str, days: int = 30) -> List[Dict]:
         """Get historical snapshots for an item."""
@@ -271,29 +278,30 @@ class MarketDatabase:
             Number of items synced
         """
         logger.info(f"Syncing {len(items_data)} items to database")
-        cursor = self.conn.cursor()
-        
-        # Clear existing items
-        logger.debug("Clearing existing items table")
-        cursor.execute("DELETE FROM items")
-        
-        # Insert all items
-        count = 0
-        for item_id_str, item_data in items_data.items():
-            try:
-                item_id = int(item_id_str)
-                name = item_data.get('en', '')
-                if name:  # Only insert items with names
-                    cursor.execute(
-                        "INSERT INTO items (item_id, name) VALUES (?, ?)",
-                        (item_id, name)
-                    )
-                    count += 1
-            except (ValueError, TypeError) as e:
-                logger.warning(f"Skipping invalid item {item_id_str}: {e}")
-                continue
-        
-        self.conn.commit()
+        with self._lock:
+            cursor = self.conn.cursor()
+            
+            # Clear existing items
+            logger.debug("Clearing existing items table")
+            cursor.execute("DELETE FROM items")
+            
+            # Insert all items
+            count = 0
+            for item_id_str, item_data in items_data.items():
+                try:
+                    item_id = int(item_id_str)
+                    name = item_data.get('en', '')
+                    if name:  # Only insert items with names
+                        cursor.execute(
+                            "INSERT INTO items (item_id, name) VALUES (?, ?)",
+                            (item_id, name)
+                        )
+                        count += 1
+                except (ValueError, TypeError) as e:
+                    logger.warning(f"Skipping invalid item {item_id_str}: {e}")
+                    continue
+            
+            self.conn.commit()
         logger.info(f"Successfully synced {count} items")
         return count
     

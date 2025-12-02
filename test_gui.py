@@ -144,7 +144,15 @@ class TestUniversusGUIDataLoading:
     @pytest.mark.asyncio
     async def test_load_datacenters_success(self, gui_instance, mock_api, mock_service):
         """Test successful datacenter loading."""
-        with patch('gui.api', mock_api), patch('gui.service', mock_service):
+        # Create async mock for get_worlds_async
+        async_api = Mock()
+        async_api.get_worlds_async = AsyncMock(return_value=[
+            {'id': 73, 'name': 'Adamantoise'},
+            {'id': 79, 'name': 'Cactuar'},
+            {'id': 54, 'name': 'Faerie'}
+        ])
+        
+        with patch('gui.api', async_api), patch('gui.service', mock_service):
             await gui_instance.load_datacenters()
         
         assert len(gui_instance.datacenters) == 2

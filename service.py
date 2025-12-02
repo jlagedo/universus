@@ -3,6 +3,8 @@ Business logic layer for market data operations.
 """
 
 import logging
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 from typing import List, Dict, Tuple
 from datetime import datetime
 
@@ -16,6 +18,9 @@ logger = logging.getLogger(__name__)
 
 # Load configuration
 config = get_config()
+
+# Thread pool executor for async operations
+_executor = ThreadPoolExecutor(max_workers=3)
 
 
 class MarketService:
@@ -77,6 +82,22 @@ class MarketService:
         logger.info(f"Initialized tracking for {len(top_items)} items with sales data")
         return top_items, len(items), len(item_velocities)
     
+    async def initialize_tracking_async(self, world: str, limit: int) -> Tuple[List[Dict], int, int]:
+        """Async version: Initialize tracking for top volume items on a world.
+        
+        Non-blocking version that runs in executor.
+        
+        Returns:
+            Tuple of (top_items, total_found, items_with_sales)
+        """
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(
+            _executor,
+            self.initialize_tracking,
+            world,
+            limit
+        )
+    
     def update_tracked_items(self, world: str) -> Tuple[int, int, List[Dict]]:
         """
         Update market data for all tracked items on a world.
@@ -116,6 +137,21 @@ class MarketService:
         
         logger.info(f"Update complete: {successful} successful, {failed} failed")
         return successful, failed, tracked_items
+    
+    async def update_tracked_items_async(self, world: str) -> Tuple[int, int, List[Dict]]:
+        """Async version: Update market data for all tracked items on a world.
+        
+        Non-blocking version that runs in executor.
+        
+        Returns:
+            Tuple of (successful_count, failed_count, tracked_items)
+        """
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(
+            _executor,
+            self.update_tracked_items,
+            world
+        )
     
     def get_top_items(self, world: str, limit: int) -> List[Dict]:
         """Get top selling items by volume on a world."""
@@ -194,3 +230,17 @@ class MarketService:
         count = self.db.sync_items(items_data)
         logger.info(f"Items sync complete: {count} items")
         return count
+    
+    async def sync_items_database_async(self) -> int:
+        """Async version: Sync item names from FFXIV Teamcraft data dump.
+        
+        Non-blocking version that runs in executor.
+        
+        Returns:
+            Number of items synced
+        """
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(
+            _executor,
+            self.sync_items_database
+        )

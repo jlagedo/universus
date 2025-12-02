@@ -9,6 +9,7 @@ Implements all features from the CLI version.
 import asyncio
 import logging
 from datetime import datetime
+from pathlib import Path
 from typing import Optional, List, Dict, Any
 
 import requests
@@ -122,6 +123,12 @@ class UniversusGUI:
         
         # Current view
         self.current_view = "dashboard"
+        
+        # Theme management
+        self.dark_mode = config.get('gui', 'theme', 'light') == 'dark'
+        self.header_ref = None
+        self.sidebar_ref = None
+        self.footer_ref = None
     
     async def load_datacenters(self):
         """Load datacenters and worlds from API."""
@@ -129,8 +136,8 @@ class UniversusGUI:
             # Ensure we have a valid API connection
             ensure_api_connection()
             
-            # Fetch worlds first to build ID-to-name mapping
-            worlds_data = api.get_worlds()
+            # Fetch worlds first to build ID-to-name mapping (async)
+            worlds_data = await api.get_worlds_async()
             self.world_id_to_name = {w['id']: w['name'] for w in worlds_data}
             self.world_name_to_id = {w['name']: w['id'] for w in worlds_data}
             
@@ -171,9 +178,232 @@ class UniversusGUI:
         if self.status_label:
             self.status_label.set_text(message)
     
+    def toggle_theme(self):
+        """Toggle between light and dark themes."""
+        self.dark_mode = not self.dark_mode
+        ui.colors(primary='#1976d2' if not self.dark_mode else '#2196f3')
+        
+        # Apply theme CSS
+        self.apply_dark_theme()
+        
+        # Save theme preference
+        config_path = Path.cwd() / "config.toml"
+        if not config_path.exists():
+            config_path = Path(__file__).parent / "config.toml"
+        
+        if config_path.exists():
+            with open(config_path, 'r') as f:
+                content = f.read()
+            
+            # Update theme setting
+            if '[gui]' in content:
+                old_theme = 'theme = "dark"' if self.dark_mode else 'theme = "light"'
+                new_theme = 'theme = "dark"' if self.dark_mode else 'theme = "light"'
+                content = content.replace(
+                    'theme = "light"' if not self.dark_mode else 'theme = "dark"',
+                    new_theme
+                )
+            else:
+                content += f'\n[gui]\ntheme = "{"dark" if self.dark_mode else "light"}"\n'
+            
+            with open(config_path, 'w') as f:
+                f.write(content)
+        
+        # Rebuild UI
+        ui.notify(f'Switched to {"dark" if self.dark_mode else "light"} theme', type='info')
+        logger.info(f'Theme changed to {"dark" if self.dark_mode else "light"}')
+    
+    def get_theme_classes(self, light: str, dark: str) -> str:
+        """Get CSS classes based on current theme."""
+        return dark if self.dark_mode else light
+    
+    def apply_dark_theme(self):
+        """Apply dark theme CSS to the application."""
+        if self.dark_mode:
+            ui.add_css('''
+                body, html {
+                    background-color: #1e1e1e;
+                    color: #e0e0e0;
+                }
+                
+                .nicegui-app {
+                    background-color: #1e1e1e;
+                }
+                
+                /* Cards */
+                .q-card, .q-expansion-item {
+                    background-color: #2d2d2d;
+                    color: #e0e0e0;
+                }
+                
+                /* Input fields */
+                .q-field__control, .q-field__native input, .q-field__native textarea {
+                    color: #e0e0e0;
+                    background-color: #3a3a3a;
+                }
+                
+                .q-field__label {
+                    color: #b0b0b0;
+                }
+                
+                /* Tables */
+                .q-table__card {
+                    background-color: #2d2d2d;
+                    color: #e0e0e0;
+                }
+                
+                .q-table tbody td {
+                    color: #e0e0e0;
+                }
+                
+                .q-table thead tr {
+                    background-color: #3a3a3a;
+                }
+                
+                .q-table thead th {
+                    color: #b0b0b0;
+                    background-color: #3a3a3a;
+                }
+                
+                /* Buttons */
+                .q-btn {
+                    color: #e0e0e0;
+                }
+                
+                .q-btn--flat {
+                    background-color: transparent;
+                    color: #e0e0e0;
+                }
+                
+                .q-btn--flat:hover {
+                    background-color: #3a3a3a;
+                }
+                
+                /* Separators */
+                .q-separator {
+                    background-color: #3a3a3a;
+                }
+                
+                /* Select/Dropdown */
+                .q-menu {
+                    background-color: #2d2d2d;
+                    color: #e0e0e0;
+                }
+                
+                .q-item {
+                    color: #e0e0e0;
+                }
+                
+                .q-item:hover {
+                    background-color: #3a3a3a;
+                }
+                
+                /* Scrollbars */
+                ::-webkit-scrollbar {
+                    width: 8px;
+                    height: 8px;
+                }
+                
+                ::-webkit-scrollbar-track {
+                    background: #2d2d2d;
+                }
+                
+                ::-webkit-scrollbar-thumb {
+                    background: #555;
+                    border-radius: 4px;
+                }
+                
+                ::-webkit-scrollbar-thumb:hover {
+                    background: #777;
+                }
+                
+                /* Labels and text */
+                .text-gray-900 {
+                    color: #e0e0e0 !important;
+                }
+                
+                .text-gray-500 {
+                    color: #b0b0b0 !important;
+                }
+                
+                .text-gray-600 {
+                    color: #a0a0a0 !important;
+                }
+                
+                .text-gray-400 {
+                    color: #c0c0c0 !important;
+                }
+                
+                .bg-white {
+                    background-color: #2d2d2d !important;
+                }
+                
+                .bg-gray-100 {
+                    background-color: #2d2d2d !important;
+                }
+                
+                .bg-gray-200 {
+                    background-color: #1e1e1e !important;
+                }
+                
+                .bg-gray-800 {
+                    background-color: #2d2d2d !important;
+                }
+                
+                .bg-gray-900 {
+                    background-color: #1e1e1e !important;
+                }
+                
+                .bg-blue-50 {
+                    background-color: #1a3a52 !important;
+                }
+                
+                .bg-yellow-50 {
+                    background-color: #3a3420 !important;
+                }
+                
+                .text-yellow-700 {
+                    color: #e8d97d !important;
+                }
+                
+                .text-yellow-600 {
+                    color: #f5e08d !important;
+                }
+                
+                .text-blue-700 {
+                    color: #6eb5ff !important;
+                }
+                
+                .text-blue-600 {
+                    color: #7fc5ff !important;
+                }
+                
+                .text-green-600 {
+                    color: #6cc874 !important;
+                }
+                
+                .text-red-600 {
+                    color: #ff6b6b !important;
+                }
+                
+                /* Progress bar */
+                .q-linear-progress {
+                    background-color: #3a3a3a;
+                }
+                
+                /* Notifications */
+                .q-notification {
+                    background-color: #2d2d2d;
+                    color: #e0e0e0;
+                }
+            ''')
+    
     def create_header(self):
         """Create the application header."""
-        with ui.header().classes('bg-blue-800 text-white'):
+        header_class = 'bg-blue-800 text-white' if not self.dark_mode else 'bg-gray-900 text-white'
+        
+        with ui.header().classes(header_class) as header:
+            self.header_ref = header
             with ui.row().classes('w-full items-center'):
                 ui.icon('public', size='lg').classes('mr-2')
                 ui.label('Universus').classes('text-2xl font-bold')
@@ -182,12 +412,13 @@ class UniversusGUI:
                 ui.space()
                 
                 # Datacenter selector
+                select_class = 'bg-blue-700 text-white' if not self.dark_mode else 'bg-gray-800 text-white'
                 self.datacenter_select = ui.select(
                     options=self.datacenter_names if self.datacenter_names else ['Loading...'],
                     value=self.selected_datacenter if self.selected_datacenter else None,
                     label='Datacenter',
                     on_change=lambda e: self.change_datacenter(e.value) if e.value and e.value != 'Loading...' else None
-                ).classes('w-40 bg-blue-700').props('dark dense outlined')
+                ).classes(f'w-40 {select_class}').props('dark dense outlined' if self.dark_mode else 'dense outlined')
                 
                 # World selector - filtered by datacenter
                 current_worlds = self.worlds_by_datacenter.get(self.selected_datacenter, self.worlds) if self.selected_datacenter else self.worlds
@@ -196,14 +427,23 @@ class UniversusGUI:
                     value=self.selected_world if self.selected_world else None,
                     label='World',
                     on_change=lambda e: self.change_world(e.value) if e.value and e.value != 'Loading...' else None
-                ).classes('w-40 bg-blue-700').props('dark dense outlined')
+                ).classes(f'w-40 {select_class}').props('dark dense outlined' if self.dark_mode else 'dense outlined')
                 
                 ui.button(icon='refresh', on_click=self.refresh_current_view).props('flat round').tooltip('Refresh')
+                
+                # Theme toggle button
+                theme_icon = 'dark_mode' if not self.dark_mode else 'light_mode'
+                ui.button(icon=theme_icon, on_click=self.toggle_theme).props('flat round').tooltip('Toggle Theme')
     
     def create_sidebar(self):
         """Create the navigation sidebar."""
-        with ui.left_drawer(value=True).classes('bg-gray-100') as drawer:
-            ui.label('Navigation').classes('text-lg font-bold p-4')
+        sidebar_class = 'bg-gray-100' if not self.dark_mode else 'bg-gray-800'
+        nav_label_class = 'text-lg font-bold p-4 text-gray-900' if not self.dark_mode else 'text-lg font-bold p-4 text-white'
+        section_label_class = 'text-sm text-gray-500 px-4 py-2' if not self.dark_mode else 'text-sm text-gray-400 px-4 py-2'
+        
+        with ui.left_drawer(value=True).classes(sidebar_class) as drawer:
+            self.sidebar_ref = drawer
+            ui.label('Navigation').classes(nav_label_class)
             
             with ui.column().classes('w-full gap-0'):
                 # Dashboard
@@ -214,7 +454,7 @@ class UniversusGUI:
                 ).classes('w-full justify-start').props('flat align=left')
                 
                 ui.separator()
-                ui.label('Market Data').classes('text-sm text-gray-500 px-4 py-2')
+                ui.label('Market Data').classes(section_label_class)
                 
                 # Datacenters - equivalent to CLI: datacenters
                 ui.button(
@@ -231,7 +471,7 @@ class UniversusGUI:
                 ).classes('w-full justify-start').props('flat align=left')
                 
                 ui.separator()
-                ui.label('Tracking').classes('text-sm text-gray-500 px-4 py-2')
+                ui.label('Tracking').classes(section_label_class)
                 
                 # Tracked Items - equivalent to CLI: list-tracked
                 ui.button(
@@ -255,7 +495,7 @@ class UniversusGUI:
                 ).classes('w-full justify-start').props('flat align=left')
                 
                 ui.separator()
-                ui.label('Analysis').classes('text-sm text-gray-500 px-4 py-2')
+                ui.label('Analysis').classes(section_label_class)
                 
                 # Item Report - equivalent to CLI: report
                 ui.button(
@@ -265,7 +505,7 @@ class UniversusGUI:
                 ).classes('w-full justify-start').props('flat align=left')
                 
                 ui.separator()
-                ui.label('Settings').classes('text-sm text-gray-500 px-4 py-2')
+                ui.label('Settings').classes(section_label_class)
                 
                 # Sync Items - equivalent to CLI: sync-items
                 ui.button(
@@ -276,10 +516,15 @@ class UniversusGUI:
     
     def create_footer(self):
         """Create the application footer."""
-        with ui.footer().classes('bg-gray-200'):
+        footer_class = 'bg-gray-200' if not self.dark_mode else 'bg-gray-900'
+        label_class = 'text-sm text-gray-600' if not self.dark_mode else 'text-sm text-gray-300'
+        label_light_class = 'text-sm text-gray-500' if not self.dark_mode else 'text-sm text-gray-400'
+        
+        with ui.footer().classes(footer_class) as footer:
+            self.footer_ref = footer
             with ui.row().classes('w-full items-center justify-between px-4'):
-                self.status_label = ui.label('Ready').classes('text-sm text-gray-600')
-                ui.label(f'Universus v{__version__} | Data from Universalis API').classes('text-sm text-gray-500')
+                self.status_label = ui.label('Ready').classes(label_class)
+                ui.label(f'Universus v{__version__} | Data from Universalis API').classes(label_light_class)
     
     def create_main_content(self):
         """Create the main content area."""
@@ -344,10 +589,13 @@ class UniversusGUI:
     # ==================== DASHBOARD VIEW ====================
     def render_dashboard(self):
         """Render the dashboard view."""
-        ui.label('Dashboard').classes('text-2xl font-bold mb-4')
+        title_class = 'text-2xl font-bold mb-4 text-gray-900' if not self.dark_mode else 'text-2xl font-bold mb-4 text-white'
+        label_class = 'text-gray-500' if not self.dark_mode else 'text-gray-400'
+        
+        ui.label('Dashboard').classes(title_class)
         
         if not self.selected_world:
-            ui.label('Please select a world from the header dropdown.').classes('text-gray-500')
+            ui.label('Please select a world from the header dropdown.').classes(label_class)
             return
         
         # Stats cards
@@ -362,7 +610,8 @@ class UniversusGUI:
             self._stat_card('Status', 'Online', 'wifi', 'teal')
         
         # Quick actions
-        ui.label('Quick Actions').classes('text-xl font-semibold mb-2')
+        actions_class = 'text-xl font-semibold mb-2 text-gray-900' if not self.dark_mode else 'text-xl font-semibold mb-2 text-white'
+        ui.label('Quick Actions').classes(actions_class)
         with ui.row().classes('gap-4 mb-6'):
             ui.button('Update Market Data', icon='sync', on_click=lambda: self.show_view('update')).props('color=primary')
             ui.button('View Top Items', icon='trending_up', on_click=lambda: self.show_view('top')).props('color=secondary')
@@ -390,11 +639,15 @@ class UniversusGUI:
     
     def _stat_card(self, title: str, value: str, icon: str, color: str):
         """Create a statistics card."""
-        with ui.card().classes('w-64'):
+        card_class = 'bg-white' if not self.dark_mode else 'bg-gray-800'
+        title_class = 'text-sm text-gray-500' if not self.dark_mode else 'text-sm text-gray-400'
+        value_class = f'text-2xl font-bold text-{color}-600' if not self.dark_mode else f'text-2xl font-bold text-{color}-400'
+        
+        with ui.card().classes(f'w-64 {card_class}'):
             with ui.row().classes('items-center justify-between w-full'):
                 with ui.column().classes('gap-0'):
-                    ui.label(title).classes('text-sm text-gray-500')
-                    ui.label(value).classes(f'text-2xl font-bold text-{color}-600')
+                    ui.label(title).classes(title_class)
+                    ui.label(value).classes(value_class)
                 ui.icon(icon, size='xl').classes(f'text-{color}-400')
     
     # ==================== DATACENTERS VIEW (CLI: datacenters) ====================
@@ -591,12 +844,12 @@ class UniversusGUI:
                         # Ensure fresh API connection before long operation
                         ensure_api_connection()
                         
-                        status_text.set_text('Fetching market data...')
+                        status_text.set_text('Fetching market data (running in background)...')
                         progress.set_value(0.3)
                         await asyncio.sleep(0.1)
                         
-                        # Run the tracking initialization
-                        top_items, total_found, items_with_sales = service.initialize_tracking(
+                        # Run the tracking initialization in executor (non-blocking)
+                        top_items, total_found, items_with_sales = await service.initialize_tracking_async(
                             self.selected_world, 
                             int(limit_input.value)
                         )
@@ -687,11 +940,11 @@ class UniversusGUI:
                         # Ensure fresh API connection before long operation
                         ensure_api_connection()
                         
-                        status_text.set_text('Fetching market data and history...')
+                        status_text.set_text('Fetching market data and history (running in background)...')
                         progress.set_value(0.1)
                         
-                        # Run the update
-                        successful, failed, tracked_items = service.update_tracked_items(self.selected_world)
+                        # Run the update in executor (non-blocking)
+                        successful, failed, tracked_items = await service.update_tracked_items_async(self.selected_world)
                         
                         progress.set_value(1.0)
                         status_text.set_text('Complete!')
@@ -844,7 +1097,7 @@ class UniversusGUI:
                     with ui.card().classes('w-full bg-blue-50'):
                         ui.label('Syncing items...').classes('text-blue-700 font-semibold')
                         progress = ui.linear_progress(show_value=False).props('indeterminate')
-                        status_text = ui.label('Fetching from FFXIV Teamcraft (this may take a moment)...').classes('text-sm text-blue-600')
+                        status_text = ui.label('Fetching from FFXIV Teamcraft (running in background, this may take a moment)...').classes('text-sm text-blue-600')
                     
                     self.set_status('Syncing items...')
                     
@@ -852,8 +1105,8 @@ class UniversusGUI:
                         # Ensure fresh API connection before long operation
                         ensure_api_connection()
                         
-                        # Run the sync
-                        count = service.sync_items_database()
+                        # Run the sync in executor (non-blocking)
+                        count = await service.sync_items_database_async()
                         
                         await asyncio.sleep(0.5)
                         progress_container.clear()
@@ -892,6 +1145,10 @@ class UniversusGUI:
     
     def build(self):
         """Build the complete GUI."""
+        # Apply theme if dark mode is enabled
+        if self.dark_mode:
+            self.apply_dark_theme()
+        
         self.create_header()
         self.create_sidebar()
         self.create_main_content()

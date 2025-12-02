@@ -5,12 +5,17 @@ API client for interacting with the Universalis API.
 import time
 import logging
 import re
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 from typing import Optional, Dict, Any, List
 import requests
 
 from config import get_config
 
 logger = logging.getLogger(__name__)
+
+# Thread pool executor for async operations
+_executor = ThreadPoolExecutor(max_workers=3)
 
 # Load configuration
 config = get_config()
@@ -145,10 +150,42 @@ class UniversalisAPI:
         
         raise last_exception
     
+    async def _make_request_async(self, url: str, params: Optional[Dict[str, Any]] = None, max_retries: int = 3) -> Dict[str, Any]:
+        """Make a rate-limited async request to the API with retry logic.
+        
+        Non-blocking version that runs _make_request in a thread pool.
+        
+        Args:
+            url: API endpoint URL
+            params: Optional query parameters
+            max_retries: Maximum number of retry attempts for transient errors
+            
+        Returns:
+            JSON response data
+            
+        Raises:
+            requests.RequestException: If request fails after all retries
+        """
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(
+            _executor,
+            self._make_request,
+            url,
+            params,
+            max_retries
+        )
+    
     def get_datacenters(self) -> list:
         """Fetch all available datacenters from the API."""
         logger.info("Fetching datacenters list")
         result = self._make_request(f"{self.base_url}/data-centers")
+        logger.info(f"Retrieved {len(result)} datacenters")
+        return result
+    
+    async def get_datacenters_async(self) -> list:
+        """Async version: Fetch all available datacenters from the API."""
+        logger.info("Fetching datacenters list (async)")
+        result = await self._make_request_async(f"{self.base_url}/data-centers")
         logger.info(f"Retrieved {len(result)} datacenters")
         return result
     
@@ -160,6 +197,17 @@ class UniversalisAPI:
         """
         logger.info("Fetching worlds list")
         result = self._make_request(f"{self.base_url}/v2/worlds")
+        logger.info(f"Retrieved {len(result)} worlds")
+        return result
+    
+    async def get_worlds_async(self) -> List[Dict[str, Any]]:
+        """Async version: Fetch all available worlds from the API.
+        
+        Returns:
+            List of world dictionaries with 'id' and 'name' keys
+        """
+        logger.info("Fetching worlds list (async)")
+        result = await self._make_request_async(f"{self.base_url}/v2/worlds")
         logger.info(f"Retrieved {len(result)} worlds")
         return result
     
@@ -177,11 +225,31 @@ class UniversalisAPI:
         logger.info(f"Retrieved {len(result.get('items', []))} items")
         return result
     
+    async def get_most_recently_updated_async(self, world: str, entries: int = None) -> Dict[str, Any]:
+        """Async version: Fetch most recently updated items for a world."""
+        validate_world_name(world)
+        if entries is None:
+            entries = config.get('api', 'max_items_per_query', 200)
+        max_items = config.get('api', 'max_items_per_query', 200)
+        logger.info(f"Fetching most recently updated items for {world} (async, limit: {entries})")
+        result = await self._make_request_async(
+            f"{self.base_url}/extra/stats/most-recently-updated",
+            params={"world": world, "entries": min(entries, max_items)}
+        )
+        logger.info(f"Retrieved {len(result.get('items', []))} items")
+        return result
+    
     def get_market_data(self, world: str, item_id: int) -> Dict[str, Any]:
         """Fetch current market data for an item on a world."""
         validate_world_name(world)
         logger.debug(f"Fetching market data for item {item_id} on {world}")
         return self._make_request(f"{self.base_url}/{world}/{item_id}")
+    
+    async def get_market_data_async(self, world: str, item_id: int) -> Dict[str, Any]:
+        """Async version: Fetch current market data for an item on a world."""
+        validate_world_name(world)
+        logger.debug(f"Fetching market data for item {item_id} on {world} (async)")
+        return await self._make_request_async(f"{self.base_url}/{world}/{item_id}")
     
     def get_history(self, world: str, item_id: int, entries: int = None) -> Dict[str, Any]:
         """Fetch sales history for an item on a world."""
@@ -190,6 +258,17 @@ class UniversalisAPI:
             entries = config.get('api', 'default_history_entries', 100)
         logger.debug(f"Fetching history for item {item_id} on {world} (limit: {entries})")
         return self._make_request(
+            f"{self.base_url}/history/{world}/{item_id}",
+            params={"entries": entries}
+        )
+    
+    async def get_history_async(self, world: str, item_id: int, entries: int = None) -> Dict[str, Any]:
+        """Async version: Fetch sales history for an item on a world."""
+        validate_world_name(world)
+        if entries is None:
+            entries = config.get('api', 'default_history_entries', 100)
+        logger.debug(f"Fetching history for item {item_id} on {world} (async, limit: {entries})")
+        return await self._make_request_async(
             f"{self.base_url}/history/{world}/{item_id}",
             params={"entries": entries}
         )
@@ -224,3 +303,13 @@ class UniversalisAPI:
                     logger.error(f"Teamcraft request failed after {max_retries} attempts: {e}")
         
         raise last_exception
+    
+    async def fetch_teamcraft_items_async(self) -> Dict[str, Dict]:
+        """Async version: Fetch item names from FFXIV Teamcraft data dump.
+        
+        Returns:
+            Dictionary mapping item_id (string) to item data with 'en' field
+        """
+        logger.info("Fetching items from FFXIV Teamcraft (async)")
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(_executor, self.fetch_teamcraft_items)
