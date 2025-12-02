@@ -205,14 +205,7 @@ class UniversusGUI:
     # View rendering methods
     def _render_dashboard(self):
         """Render dashboard view."""
-        quick_actions_row, tracked_items, _ = dashboard.render(
-            self.state, self.db, self.theme.dark_mode
-        )
-        if quick_actions_row:
-            with quick_actions_row:
-                ui.button('Update Market Data', icon='sync', on_click=lambda: self.show_view('update')).props('color=primary')
-                ui.button('View Top Items', icon='trending_up', on_click=lambda: self.show_view('top')).props('color=secondary')
-                ui.button('Initialize Tracking', icon='add_circle', on_click=lambda: self.show_view('init_tracking')).props('color=accent')
+        dashboard.render(self.state, self.db, self.theme.dark_mode)
     
     def _render_datacenters(self):
         """Render datacenters view."""
