@@ -34,6 +34,10 @@ class MarketService:
         """Fetch and return all datacenters."""
         return self.api.get_datacenters()
     
+    def get_available_worlds(self) -> List[Dict]:
+        """Fetch and return all available worlds (id and name)."""
+        return self.api.get_worlds()
+    
     def initialize_tracking(self, world: str, limit: int) -> Tuple[List[Dict], int, int]:
         """
         Initialize tracking for top volume items on a world.
@@ -272,3 +276,60 @@ class MarketService:
             _executor,
             self.sync_marketable_items
         )
+
+    def add_tracked_world(self, world: str = None, world_id: int = None) -> Dict:
+        """Add a world to the tracked worlds configuration.
+        
+        Accepts either a `world` name or `world_id`. When only name is provided,
+        it is resolved via the Universalis worlds API.
+        
+        Returns:
+            Dict with keys `id` and `name` for the inserted world.
+        """
+        logger.info("Adding tracked world configuration")
+        if world_id is None and not world:
+            raise ValueError("Either world name or world_id must be provided")
+        
+        resolved_id = world_id
+        resolved_name = world
+        
+        if resolved_id is None:
+            worlds = self.api.get_worlds()
+            match = next((w for w in worlds if w.get('name') == world), None)
+            if not match:
+                raise ValueError(f"World not found: {world}")
+            resolved_id = match.get('id')
+            resolved_name = match.get('name')
+        else:
+            if resolved_name is None:
+                worlds = self.api.get_worlds()
+                match = next((w for w in worlds if w.get('id') == world_id), None)
+                resolved_name = match.get('name') if match else None
+        
+        inserted = self.db.add_tracked_world(int(resolved_id), resolved_name)
+        if not inserted:
+            logger.info("World already present in tracked configuration")
+        return {"id": int(resolved_id), "name": resolved_name}
+
+    def remove_tracked_world(self, world: str = None, world_id: int = None) -> bool:
+        """Remove a world from the tracked worlds configuration."""
+        logger.info("Removing tracked world configuration")
+        if world_id is None and not world:
+            raise ValueError("Either world name or world_id must be provided")
+        
+        resolved_id = world_id
+        if resolved_id is None:
+            worlds = self.api.get_worlds()
+            match = next((w for w in worlds if w.get('name') == world), None)
+            if not match:
+                raise ValueError(f"World not found: {world}")
+            resolved_id = match.get('id')
+        return self.db.remove_tracked_world(int(resolved_id))
+
+    def list_tracked_worlds(self) -> List[Dict]:
+        """List all tracked worlds from the database."""
+        return self.db.list_tracked_worlds()
+
+    def clear_tracked_worlds(self):
+        """Clear all tracked worlds from the database."""
+        self.db.clear_tracked_worlds()

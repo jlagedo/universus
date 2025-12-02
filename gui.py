@@ -513,6 +513,13 @@ class UniversusGUI:
                     icon='cloud_download',
                     on_click=lambda: self.show_view('sync_items')
                 ).classes('w-full justify-start').props('flat align=left')
+                
+                # Tracked Worlds - new configuration CRUD
+                ui.button(
+                    'Tracked Worlds',
+                    icon='public',
+                    on_click=lambda: self.show_view('tracked_worlds')
+                ).classes('w-full justify-start').props('flat align=left')
     
     def create_footer(self):
         """Create the application footer."""
@@ -557,6 +564,8 @@ class UniversusGUI:
                 self.render_report()
             elif view == 'sync_items':
                 self.render_sync_items()
+            elif view == 'tracked_worlds':
+                self.render_tracked_worlds()
     
     async def refresh_current_view(self):
         """Refresh the current view."""
@@ -1125,6 +1134,73 @@ class UniversusGUI:
                         ui.notify(f'Error: {e}', type='negative')
             
             ui.button('Sync Now', icon='cloud_download', on_click=start_sync).props('color=primary').classes('mt-4')
+    
+    # ==================== TRACKED WORLDS VIEW (CRUD) ====================
+    def render_tracked_worlds(self):
+        """Render tracked worlds configuration CRUD view."""
+        ui.label('Tracked Worlds').classes('text-2xl font-bold mb-4')
+        ui.label('Manage the list of worlds to track.').classes('text-gray-500 mb-4')
+        
+        async def ensure_worlds_loaded():
+            if not self.world_name_to_id:
+                await self.load_datacenters()
+        
+        # Add world section
+        with ui.card().classes('w-full max-w-xl'):
+            ui.label('Add World').classes('text-lg font-semibold mb-2')
+            
+            async def add_world(name: str):
+                try:
+                    await ensure_worlds_loaded()
+                    wid = self.world_name_to_id.get(name)
+                    if not wid:
+                        ui.notify('Invalid world selected', type='warning')
+                        return
+                    service.add_tracked_world(world=name, world_id=wid)
+                    ui.notify(f'Added tracked world: {name}', type='positive')
+                    self.show_view('tracked_worlds')
+                except Exception as e:
+                    ui.notify(f'Error: {e}', type='negative')
+            
+            world_select = ui.select(options=sorted(list(self.world_name_to_id.keys())), label='World').classes('w-full')
+            ui.button('Add', icon='add', on_click=lambda: add_world(world_select.value)).props('color=primary').classes('mt-2')
+        
+        # Existing tracked worlds table
+        tracked = service.list_tracked_worlds()
+        if not tracked:
+            with ui.card().classes('w-full bg-yellow-50 mt-4'):
+                ui.label('No tracked worlds configured.').classes('text-yellow-700')
+        else:
+            ui.label('Configured Worlds').classes('text-lg font-semibold mt-6')
+            
+            columns = [
+                {'name': 'world_id', 'label': 'World ID', 'field': 'world_id', 'align': 'left'},
+                {'name': 'world_name', 'label': 'World Name', 'field': 'world_name', 'align': 'left'},
+                {'name': 'added_at', 'label': 'Added', 'field': 'added_at', 'align': 'left'},
+                {'name': 'actions', 'label': 'Actions', 'field': 'actions', 'align': 'center'},
+            ]
+            rows = []
+            for w in tracked:
+                rows.append({
+                    'world_id': w.get('world_id'),
+                    'world_name': w.get('world_name') or self.world_id_to_name.get(w.get('world_id'), 'Unknown'),
+                    'added_at': w.get('added_at') or '',
+                    'actions': ''
+                })
+            table = ui.table(columns=columns, rows=rows, row_key='world_id').classes('w-full')
+            
+            # Add remove buttons per row
+            for row in rows:
+                def make_remove(wid, wname):
+                    async def remove_world():
+                        try:
+                            service.remove_tracked_world(world_id=wid)
+                            ui.notify(f'Removed tracked world: {wname or wid}', type='positive')
+                            self.show_view('tracked_worlds')
+                        except Exception as e:
+                            ui.notify(f'Error: {e}', type='negative')
+                    return remove_world
+                ui.button('Remove', icon='delete', on_click=make_remove(row['world_id'], row['world_name'])).props('color=negative').classes('mt-2')
     
     async def initialize(self):
         """Initialize the GUI with data."""

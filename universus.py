@@ -253,5 +253,74 @@ def sync_marketable(ctx):
         MarketUI.exit_with_error(f"Failed to sync marketable items: {str(e)}")
 
 
+@cli.group(name='tracked-worlds')
+@click.pass_context
+def tracked_worlds_group(ctx):
+    """Manage tracked worlds configuration (CRUD)."""
+    pass
+
+
+@tracked_worlds_group.command('list')
+@click.pass_context
+def tracked_worlds_list(ctx):
+    """List all tracked worlds."""
+    logger.info("Executing 'tracked-worlds list' command")
+    service = ctx.obj['SERVICE']
+    worlds = service.list_tracked_worlds()
+    MarketUI.show_tracked_worlds(worlds)
+
+
+@tracked_worlds_group.command('add')
+@click.option('--world', required=False, help='World name (e.g., Behemoth)')
+@click.option('--world-id', required=False, type=int, help='World ID')
+@click.pass_context
+def tracked_worlds_add(ctx, world, world_id):
+    """Add a world to tracked worlds configuration."""
+    logger.info("Executing 'tracked-worlds add' command")
+    service = ctx.obj['SERVICE']
+    try:
+        with MarketUI.show_status("Resolving world..."):
+            info = service.add_tracked_world(world=world, world_id=world_id)
+        MarketUI.print_success(f"Added tracked world: {info['name'] or info['id']} (ID {info['id']})")
+    except Exception as e:
+        logger.error(f"Failed to add tracked world: {e}")
+        MarketUI.exit_with_error(str(e))
+
+
+@tracked_worlds_group.command('remove')
+@click.option('--world', required=False, help='World name (e.g., Behemoth)')
+@click.option('--world-id', required=False, type=int, help='World ID')
+@click.pass_context
+def tracked_worlds_remove(ctx, world, world_id):
+    """Remove a world from tracked worlds configuration."""
+    logger.info("Executing 'tracked-worlds remove' command")
+    service = ctx.obj['SERVICE']
+    try:
+        with MarketUI.show_status("Removing world..."):
+            deleted = service.remove_tracked_world(world=world, world_id=world_id)
+        if deleted:
+            MarketUI.print_success("Removed tracked world")
+        else:
+            MarketUI.print_warning("World not found in tracked configuration")
+    except Exception as e:
+        logger.error(f"Failed to remove tracked world: {e}")
+        MarketUI.exit_with_error(str(e))
+
+
+@tracked_worlds_group.command('clear')
+@click.pass_context
+def tracked_worlds_clear(ctx):
+    """Clear all tracked worlds configuration."""
+    logger.info("Executing 'tracked-worlds clear' command")
+    service = ctx.obj['SERVICE']
+    try:
+        with MarketUI.show_status("Clearing tracked worlds..."):
+            service.clear_tracked_worlds()
+        MarketUI.print_success("Cleared tracked worlds configuration")
+    except Exception as e:
+        logger.error(f"Failed to clear tracked worlds: {e}")
+        MarketUI.exit_with_error(str(e))
+
+
 if __name__ == "__main__":
     cli(obj={})

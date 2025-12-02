@@ -79,6 +79,15 @@ class MarketDatabase:
             )
         """)
         
+        # Table for tracked worlds configuration
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS tracked_worlds (
+                world_id INTEGER PRIMARY KEY,
+                world_name TEXT,
+                added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
         # Table for marketable items
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS marketable_items (
@@ -336,6 +345,60 @@ class MarketDatabase:
             )
         else:
             cursor.execute("SELECT COUNT(*) as count FROM tracked_items")
+        return cursor.fetchone()['count']
+    
+    def add_tracked_world(self, world_id: int, world_name: Optional[str] = None) -> bool:
+        """Add a world to tracked worlds configuration.
+        
+        Returns True if inserted, False if already present.
+        """
+        logger.debug(f"Adding tracked world: id={world_id}, name={world_name}")
+        with self._lock:
+            cursor = self.conn.cursor()
+            cursor.execute(
+                "INSERT OR IGNORE INTO tracked_worlds (world_id, world_name) VALUES (?, ?)",
+                (world_id, world_name)
+            )
+            self.conn.commit()
+            inserted = cursor.rowcount > 0
+        logger.debug(f"Tracked world {'inserted' if inserted else 'already exists'}: {world_id}")
+        return inserted
+    
+    def remove_tracked_world(self, world_id: int) -> bool:
+        """Remove a world from tracked worlds configuration.
+        
+        Returns True if a row was deleted.
+        """
+        logger.debug(f"Removing tracked world: id={world_id}")
+        with self._lock:
+            cursor = self.conn.cursor()
+            cursor.execute("DELETE FROM tracked_worlds WHERE world_id = ?", (world_id,))
+            self.conn.commit()
+            deleted = cursor.rowcount > 0
+        logger.debug(f"Tracked world {'deleted' if deleted else 'not found'}: {world_id}")
+        return deleted
+    
+    def list_tracked_worlds(self) -> List[Dict]:
+        """List all tracked worlds."""
+        cursor = self.conn.cursor()
+        cursor.execute(
+            "SELECT world_id, world_name, added_at FROM tracked_worlds ORDER BY world_name COLLATE NOCASE ASC"
+        )
+        return [dict(row) for row in cursor.fetchall()]
+    
+    def clear_tracked_worlds(self):
+        """Clear all tracked worlds configuration."""
+        logger.debug("Clearing tracked_worlds table")
+        with self._lock:
+            cursor = self.conn.cursor()
+            cursor.execute("DELETE FROM tracked_worlds")
+            self.conn.commit()
+        logger.info("Tracked worlds cleared")
+    
+    def get_tracked_worlds_count(self) -> int:
+        """Get count of tracked worlds."""
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT COUNT(*) as count FROM tracked_worlds")
         return cursor.fetchone()['count']
     
     def sync_marketable_items(self, item_ids: List[int]) -> int:

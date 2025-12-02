@@ -213,6 +213,25 @@ class MarketUI:
         for world, items in sorted(by_world.items()):
             console.print(f"[bold]{world}[/bold]: {len(items)} items")
             console.print(f"[dim]Last updated: {items[0]['last_updated']}[/dim]\n")
+
+    @staticmethod
+    def show_tracked_worlds(worlds: List[Dict]):
+        """Display tracked worlds configuration in a table."""
+        table = Table(title="Tracked Worlds", show_header=True, header_style="bold magenta")
+        table.add_column("World ID", style="cyan")
+        table.add_column("World Name", style="yellow")
+        table.add_column("Added", style="green")
+        
+        if not worlds:
+            MarketUI.print_warning("No tracked worlds configured.")
+        else:
+            for w in worlds:
+                table.add_row(
+                    str(w.get('world_id')),
+                    w.get('world_name') or 'Unknown',
+                    (w.get('added_at') or '')
+                )
+            console.print(table)
     
     @staticmethod
     def exit_with_error(message: str, exit_code: int = 1):
