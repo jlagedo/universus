@@ -1188,19 +1188,28 @@ class UniversusGUI:
                     'actions': ''
                 })
             table = ui.table(columns=columns, rows=rows, row_key='world_id').classes('w-full')
-            
-            # Add remove buttons per row
-            for row in rows:
-                def make_remove(wid, wname):
-                    async def remove_world():
-                        try:
-                            service.remove_tracked_world(world_id=wid)
-                            ui.notify(f'Removed tracked world: {wname or wid}', type='positive')
-                            self.show_view('tracked_worlds')
-                        except Exception as e:
-                            ui.notify(f'Error: {e}', type='negative')
-                    return remove_world
-                ui.button('Remove', icon='delete', on_click=make_remove(row['world_id'], row['world_name'])).props('color=negative').classes('mt-2')
+
+            # Inline remove button slot in actions column
+            slot_html = (
+                '<q-td key="actions" :props="props">'
+                '<q-btn size="sm" flat color="negative" icon="delete" '
+                '@click="$parent.$emit(\'remove_world\', props.row)"></q-btn>'
+                '</q-td>'
+            )
+            table.add_slot('body-cell-actions', slot_html)
+
+            def on_remove_world(e):
+                row = e.args
+                wid = row.get('world_id')
+                wname = row.get('world_name')
+                try:
+                    service.remove_tracked_world(world_id=wid)
+                    ui.notify(f'Removed tracked world: {wname or wid}', type='positive')
+                    self.show_view('tracked_worlds')
+                except Exception as ex:
+                    ui.notify(f'Error: {ex}', type='negative')
+
+            table.on('remove_world', on_remove_world)
     
     async def initialize(self):
         """Initialize the GUI with data."""
