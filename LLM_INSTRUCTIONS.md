@@ -13,6 +13,8 @@ Universus is a Python application for tracking Final Fantasy XIV market prices w
 - **Testing**: pytest (174 tests across 7 modules, 2560+ lines)
 - **Database**: SQLite with thread-safety (9 tables)
 - **GUI**: NiceGUI with modular component-based architecture
+- **GUI Fonts**: Orbitron (display), Exo 2 (body), Rajdhani (accent) via Google Fonts
+- **GUI Icons**: Material Icons via `GameIcons` class (built into NiceGUI)
 - **API**: Universalis API with rate limiting (20 req/s, token bucket)
 - **Version**: 1.0.0
 
@@ -58,7 +60,7 @@ Universus is a Python application for tracking Final Fantasy XIV market prices w
 - `gui/state.py` - Application state management
 - `gui/components/` - Reusable UI components (header, sidebar, footer, cards)
 - `gui/views/` - Page controllers (dashboard, tracking, reports, settings)
-- `gui/utils/` - Utilities (formatters, theme)
+- `gui/utils/` - Utilities (formatters, theme, icons)
 
 ### Testing
 - `test_*.py` - Unit tests for each module (174 tests, 2560+ lines)
@@ -146,6 +148,72 @@ with self._lock:  # threading.Lock()
 ```
 
 **Read Operations**: No lock needed (SQLite handles it)
+
+### 5. GUI Theming Strategy
+
+#### Fonts (Gaming-Optimized)
+The GUI uses **Google Fonts** loaded via CDN for a gaming aesthetic:
+
+| Font | CSS Variable | Usage |
+|------|--------------|-------|
+| **Orbitron** | `--font-display` | Headers, titles, logo |
+| **Exo 2** | `--font-body` | Body text, buttons, inputs |
+| **Rajdhani** | `--font-accent` | Stats, tables, navigation |
+
+**Implementation** (`gui/utils/theme.py`):
+```python
+GOOGLE_FONTS_HTML = '''
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Exo+2:wght@300;400;600;700&family=Rajdhani:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/@mdi/font@7.4.47/css/materialdesignicons.min.css" rel="stylesheet">
+'''
+```
+
+#### Icons (Material Icons)
+The GUI uses **Material Icons** (built into NiceGUI/Quasar) for iconography:
+
+**Icon Class** (`gui/utils/icons.py`):
+```python
+from gui.utils.icons import GameIcons
+
+# Usage in components
+ui.button('Dashboard', icon=GameIcons.DASHBOARD)
+ui.button('Track Items', icon=GameIcons.TRACK)
+ui.icon(GameIcons.GOLD).classes('text-yellow-400')
+```
+
+**Icon Prefixes** (for variants):
+- None: filled icons (default)
+- `o_`: outlined icons
+- `r_`: rounded icons
+- `s_`: sharp icons
+
+**Icon Categories**:
+| Category | Examples |
+|----------|----------|
+| Navigation | `DASHBOARD`, `HOME`, `MENU`, `SETTINGS` |
+| Market | `TRENDING`, `CHART_BAR`, `ANALYTICS`, `PRICE` |
+| Data | `WORLD`, `DATACENTER`, `CLOUD_SYNC`, `DATABASE` |
+| Tracking | `TRACK`, `VISIBILITY`, `TARGET`, `WATCH` |
+| Actions | `ADD`, `REMOVE`, `SYNC`, `REFRESH`, `PLAY` |
+| Game/RPG | `SWORD`, `SHIELD`, `TREASURE`, `GOLD`, `CRYSTAL` |
+| Status | `SUCCESS`, `WARNING`, `ERROR`, `INFO` |
+| Theme | `THEME_LIGHT`, `THEME_DARK` |
+
+**Icon Reference**: https://fonts.google.com/icons?icon.set=Material+Icons
+
+#### Adding New Icons
+1. Find icon at https://fonts.google.com/icons
+2. Add constant to `gui/utils/icons.py` (use snake_case name):
+```python
+class GameIcons:
+    # ...existing icons...
+    NEW_ICON = "icon_name"  # e.g., "favorite", "star", "home"
+```
+3. Import and use in components:
+```python
+from ..utils.icons import GameIcons
+ui.button('Action', icon=GameIcons.NEW_ICON)
+```
 
 ## Code Conventions
 
@@ -497,6 +565,28 @@ response = requests.get(url)
 response = self.api.get_data()
 ```
 
+### 6. Hardcoded Icons
+```python
+# Wrong - Hardcoded Material Icons string
+ui.button('Dashboard', icon='dashboard')
+
+# Right - Use centralized GameIcons class
+from gui.utils.icons import GameIcons
+ui.button('Dashboard', icon=GameIcons.DASHBOARD)
+```
+
+### 7. Missing Font Loading
+```python
+# Wrong - Fonts not loaded, fallback to system fonts
+def build(self):
+    self.create_header()
+
+# Right - Load fonts before building UI
+def build(self):
+    self.theme.load_fonts()  # Load Google Fonts + MDI
+    self.create_header()
+```
+
 ## Debugging Tips
 
 ### Enable Verbose Logging
@@ -613,12 +703,14 @@ When working with this codebase:
 ✅ Write tests for new functionality
 ✅ Follow existing patterns
 ✅ Keep documentation updated
+✅ Use `GameIcons` class for all icons (not hardcoded strings)
+✅ Ensure fonts are loaded via `theme.load_fonts()`
 
 The codebase is well-structured and testable. Follow the established patterns and you'll have a smooth experience!
 
 ---
 
-**Last Updated**: December 2, 2025
+**Last Updated**: December 3, 2025
 **For**: AI Assistants and LLMs
 **Status**: Production Ready
 **Version**: 1.0.0

@@ -7,7 +7,7 @@ import logging
 from nicegui import ui
 
 from .state import AppState
-from .utils import ThemeManager
+from .utils import ThemeManager, GameIcons
 from .components import Header, Sidebar, Footer
 from .views import (
     dashboard, datacenters, top_items, tracked_items,
@@ -229,7 +229,7 @@ class UniversusGUI:
                     ui.notify(f'Error: {e}', type='negative')
                     self.set_status('Error')
             
-            ui.button('Fetch Top Items', icon='trending_up', on_click=fetch_top).props('color=primary')
+            ui.button('Fetch Top Items', icon=GameIcons.TRENDING, on_click=fetch_top).props('color=primary')
     
     def _render_tracked_items(self):
         """Render tracked items view."""
@@ -249,7 +249,7 @@ class UniversusGUI:
                     progress_container, self.set_status
                 )
             
-            ui.button('Start Tracking', icon='play_arrow', on_click=start_tracking).props('color=primary').classes('mt-4')
+            ui.button('Start Tracking', icon=GameIcons.PLAY, on_click=start_tracking).props('color=primary').classes('mt-4')
     
     def _render_update(self):
         """Render update view."""
@@ -264,7 +264,7 @@ class UniversusGUI:
                     self.state, self.service, progress_container, self.set_status
                 )
             
-            ui.button('Update Now', icon='sync', on_click=start_update).props('color=primary').classes('mt-4')
+            ui.button('Update Now', icon=GameIcons.SYNC, on_click=start_update).props('color=primary').classes('mt-4')
     
     def _render_report(self):
         """Render item report view."""
@@ -287,7 +287,7 @@ class UniversusGUI:
                     report_container, self.set_status
                 )
             
-            ui.button('Generate Report', icon='analytics', on_click=generate).props('color=primary').classes('mt-4')
+            ui.button('Generate Report', icon=GameIcons.ANALYTICS, on_click=generate).props('color=primary').classes('mt-4')
     
     def _render_sync_items(self):
         """Render sync items view."""
@@ -299,7 +299,7 @@ class UniversusGUI:
                 self.service, progress_container, self.set_status
             )
         
-        ui.button('Sync Now', icon='cloud_download', on_click=start_sync).props('color=primary').classes('mt-4')
+        ui.button('Sync Now', icon=GameIcons.CLOUD_SYNC, on_click=start_sync).props('color=primary').classes('mt-4')
     
     def _render_tracked_worlds(self):
         """Render tracked worlds view."""
@@ -317,7 +317,7 @@ class UniversusGUI:
                 self.state, self.service, world_select.value, refresh_table
             )
         
-        ui.button('Add', icon='add', on_click=add_world).props('color=primary').classes('mt-2')
+        ui.button('Add', icon=GameIcons.ADD, on_click=add_world).props('color=primary').classes('mt-2')
         
         # Initial render
         refresh_table()
@@ -335,7 +335,7 @@ class UniversusGUI:
                     int(limit_input.value), report_container, self.set_status
                 )
             
-            ui.button('Generate Report', icon='bar_chart', on_click=generate).props('color=primary').classes('mt-4')
+            ui.button('Generate Report', icon=GameIcons.CHART_BAR, on_click=generate).props('color=primary').classes('mt-4')
     
     def _render_sell_volume_chart(self):
         """Render sell volume chart view."""
@@ -350,7 +350,7 @@ class UniversusGUI:
                     chart_container, self.set_status
                 )
             
-            ui.button('Generate Chart', icon='pie_chart', on_click=generate).props('color=primary').classes('mt-4')
+            ui.button('Generate Chart', icon=GameIcons.CHART_PIE, on_click=generate).props('color=primary').classes('mt-4')
     
     async def initialize(self):
         """Initialize the GUI with data."""
@@ -358,6 +358,9 @@ class UniversusGUI:
     
     def build(self):
         """Build the complete GUI."""
+        # Load gaming fonts (always)
+        self.theme.load_fonts()
+        
         if self.theme.dark_mode:
             self.theme.apply_css()
         

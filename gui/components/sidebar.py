@@ -5,6 +5,8 @@ Navigation sidebar component.
 from typing import Callable
 from nicegui import ui
 
+from ..utils.icons import GameIcons
+
 
 class Sidebar:
     """Navigation sidebar component."""
@@ -32,7 +34,7 @@ class Sidebar:
                 # Dashboard
                 ui.button(
                     'Dashboard',
-                    icon='dashboard',
+                    icon=GameIcons.DASHBOARD,
                     on_click=lambda: on_view_change('dashboard')
                 ).classes('w-full justify-start').props('flat align=left')
                 
@@ -42,14 +44,14 @@ class Sidebar:
                 # Datacenters
                 ui.button(
                     'Datacenters',
-                    icon='dns',
+                    icon=GameIcons.DATACENTER,
                     on_click=lambda: on_view_change('datacenters')
                 ).classes('w-full justify-start').props('flat align=left')
                 
                 # Top Items
                 ui.button(
                     'Top Items',
-                    icon='trending_up',
+                    icon=GameIcons.TRENDING,
                     on_click=lambda: on_view_change('top')
                 ).classes('w-full justify-start').props('flat align=left')
                 
@@ -59,21 +61,21 @@ class Sidebar:
                 # Tracked Items
                 ui.button(
                     'Tracked Items',
-                    icon='visibility',
+                    icon=GameIcons.TRACK,
                     on_click=lambda: on_view_change('tracked')
                 ).classes('w-full justify-start').props('flat align=left')
                 
                 # Init Tracking
                 ui.button(
                     'Initialize Tracking',
-                    icon='add_circle',
+                    icon=GameIcons.ADD,
                     on_click=lambda: on_view_change('init_tracking')
                 ).classes('w-full justify-start').props('flat align=left')
                 
                 # Update
                 ui.button(
                     'Update Data',
-                    icon='sync',
+                    icon=GameIcons.SYNC,
                     on_click=lambda: on_view_change('update')
                 ).classes('w-full justify-start').props('flat align=left')
                 
@@ -83,21 +85,21 @@ class Sidebar:
                 # Item Report
                 ui.button(
                     'Item Report',
-                    icon='analytics',
+                    icon=GameIcons.ANALYTICS,
                     on_click=lambda: on_view_change('report')
                 ).classes('w-full justify-start').props('flat align=left')
                 
                 # Sell Volume by World Report
                 ui.button(
                     'Sell Volume by World',
-                    icon='insights',
+                    icon=GameIcons.INSIGHTS,
                     on_click=lambda: on_view_change('sell_volume')
                 ).classes('w-full justify-start').props('flat align=left')
 
                 # Sell Volume Chart
                 ui.button(
                     'Sell Volume Chart',
-                    icon='pie_chart',
+                    icon=GameIcons.CHART_PIE,
                     on_click=lambda: on_view_change('sell_volume_chart')
                 ).classes('w-full justify-start').props('flat align=left')
                 
@@ -107,13 +109,13 @@ class Sidebar:
                 # Sync Items
                 ui.button(
                     'Sync Item Names',
-                    icon='cloud_download',
+                    icon=GameIcons.CLOUD_DOWNLOAD,
                     on_click=lambda: on_view_change('sync_items')
                 ).classes('w-full justify-start').props('flat align=left')
                 
                 # Tracked Worlds
                 ui.button(
                     'Tracked Worlds',
-                    icon='public',
+                    icon=GameIcons.WORLD,
                     on_click=lambda: on_view_change('tracked_worlds')
                 ).classes('w-full justify-start').props('flat align=left')

@@ -5,6 +5,8 @@ Application header component.
 from typing import Callable, Optional
 from nicegui import ui
 
+from ..utils.icons import GameIcons
+
 
 class Header:
     """Application header with datacenter/world selectors."""
@@ -69,7 +71,7 @@ class Header:
         
         with ui.header().classes(header_class):
             with ui.row().classes('w-full items-center'):
-                ui.icon('public', size='lg').classes('mr-2')
+                ui.icon(GameIcons.WORLD, size='lg').classes('mr-2')
                 ui.label('Universus').classes('text-2xl font-bold')
                 ui.label('FFXIV Market Tracker').classes('text-sm ml-2 opacity-75')
                 
@@ -92,10 +94,10 @@ class Header:
                     on_change=lambda e: on_world_change(e.value) if e.value and e.value != 'Loading...' else None
                 ).classes(f'w-40 {select_class}').props('dark dense outlined' if self.dark_mode else 'dense outlined')
                 
-                ui.button(icon='refresh', on_click=on_refresh).props('flat round').tooltip('Refresh')
+                ui.button(icon=GameIcons.REFRESH, on_click=on_refresh).props('flat round').tooltip('Refresh')
                 
                 # Theme toggle button
-                theme_icon = 'dark_mode' if not self.dark_mode else 'light_mode'
+                theme_icon = GameIcons.THEME_DARK if not self.dark_mode else GameIcons.THEME_LIGHT
                 ui.button(icon=theme_icon, on_click=on_theme_toggle).props('flat round').tooltip('Toggle Theme')
     
     def update_datacenters(self, datacenter_names: list, selected_datacenter: str):
