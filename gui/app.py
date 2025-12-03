@@ -10,8 +10,8 @@ from .state import AppState
 from .utils import ThemeManager, GameIcons
 from .components import Header, Sidebar, Footer
 from .views import (
-    dashboard, datacenters, top_items, tracked_items,
-    tracking, reports, settings
+    dashboard, datacenters, top_items,
+    reports, settings
 )
 
 logger = logging.getLogger(__name__)
@@ -169,16 +169,10 @@ class UniversusGUI:
                 self._render_datacenters()
             elif view == 'top':
                 self._render_top_items()
-            elif view == 'tracked':
-                self._render_tracked_items()
-            elif view == 'init_tracking':
-                self._render_init_tracking()
-            elif view == 'update':
-                self._render_update()
             elif view == 'report':
                 self._render_report()
-            elif view == 'sync_items':
-                self._render_sync_items()
+            elif view == 'import_static_data':
+                self._render_import_static_data()
             elif view == 'tracked_worlds':
                 self._render_tracked_worlds()
             elif view == 'sell_volume':
@@ -236,41 +230,6 @@ class UniversusGUI:
             
             ui.button('Fetch Top Items', icon=GameIcons.TRENDING, on_click=fetch_top).props('color=primary')
     
-    def _render_tracked_items(self):
-        """Render tracked items view."""
-        tracked_items.render(self.state, self.service, self.theme.dark_mode)
-    
-    def _render_init_tracking(self):
-        """Render init tracking view."""
-        limit_input, progress_container = tracking.render_init_tracking(
-            self.state, self.service, self.theme.dark_mode
-        )
-        
-        if limit_input and progress_container:
-            async def start_tracking():
-                self._ensure_api_connection()
-                await tracking.execute_init_tracking(
-                    self.state, self.service, int(limit_input.value),
-                    progress_container, self.set_status
-                )
-            
-            ui.button('Start Tracking', icon=GameIcons.PLAY, on_click=start_tracking).props('color=primary').classes('mt-4')
-    
-    def _render_update(self):
-        """Render update view."""
-        progress_container = tracking.render_update(
-            self.state, self.db, self.theme.dark_mode
-        )
-        
-        if progress_container:
-            async def start_update():
-                self._ensure_api_connection()
-                await tracking.execute_update(
-                    self.state, self.service, progress_container, self.set_status
-                )
-            
-            ui.button('Update Now', icon=GameIcons.SYNC, on_click=start_update).props('color=primary').classes('mt-4')
-    
     def _render_report(self):
         """Render item report view."""
         item_id_input, days_input, report_container = reports.render_item_report(
@@ -294,17 +253,17 @@ class UniversusGUI:
             
             ui.button('Generate Report', icon=GameIcons.ANALYTICS, on_click=generate).props('color=primary').classes('mt-4')
     
-    def _render_sync_items(self):
-        """Render sync items view."""
-        progress_container = settings.render_sync_items(self.db, self.theme.dark_mode)
+    def _render_import_static_data(self):
+        """Render import static data view."""
+        progress_container = settings.render_import_static_data(self.db, self.theme.dark_mode)
         
-        async def start_sync():
+        async def start_import():
             self._ensure_api_connection()
-            await settings.execute_sync_items(
+            await settings.execute_import_static_data(
                 self.service, progress_container, self.set_status
             )
         
-        ui.button('Sync Now', icon=GameIcons.CLOUD_SYNC, on_click=start_sync).props('color=primary').classes('mt-4')
+        ui.button('Import Now', icon=GameIcons.CLOUD_SYNC, on_click=start_import).props('color=primary').classes('mt-4')
     
     def _render_tracked_worlds(self):
         """Render tracked worlds view."""

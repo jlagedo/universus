@@ -70,66 +70,6 @@ class MarketUI:
         console.print(f"\n[bold]Total:[/bold] {len(datacenters)} datacenters")
     
     @staticmethod
-    def show_init_tracking_header(world: str, limit: int):
-        """Display header for init tracking operation."""
-        console.print(f"[cyan]Initializing tracking for {world}...[/cyan]")
-        console.print(f"[dim]Rate limit: 20 requests/second (respecting API limits)[/dim]\n")
-    
-    @staticmethod
-    def show_init_tracking_progress(total: int):
-        """Create and return a progress bar for init tracking."""
-        return Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            console=console
-        )
-    
-    @staticmethod
-    def show_init_tracking_results(world: str, top_items: List[Dict], db_path: str):
-        """Display results of init tracking operation."""
-        console.print(f"[green]Found items. Analyzing sale velocities...[/green]\n")
-        
-        table = Table(title=f"Tracking Top {len(top_items)} Items on {world}", 
-                     show_header=True, header_style="bold magenta")
-        table.add_column("Item ID", style="cyan")
-        table.add_column("Daily Sales", justify="right", style="green")
-        table.add_column("Avg Price", justify="right", style="yellow")
-        
-        for item in top_items:
-            table.add_row(
-                str(item['item_id']),
-                f"{item['velocity']:.2f}",
-                f"{item['avg_price']:,.0f} gil"
-            )
-        
-        console.print(table)
-        MarketUI.print_success(f"Initialized tracking for {len(top_items)} items on {world}")
-        MarketUI.print_dim(f"Database: {db_path}")
-    
-    @staticmethod
-    def show_update_header(world: str, item_count: int):
-        """Display header for update operation."""
-        console.print(f"[cyan]Updating {item_count} items on {world}...[/cyan]")
-        console.print(f"[dim]Rate limit: 20 requests/second • This will take ~{item_count // 20 + 1} seconds[/dim]\n")
-    
-    @staticmethod
-    def show_update_progress(total: int):
-        """Create and return a progress bar for update operation."""
-        return Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            console=console
-        )
-    
-    @staticmethod
-    def show_update_results(successful: int, failed: int):
-        """Display results of update operation."""
-        MarketUI.print_success(f"Updated {successful} items")
-        if failed > 0:
-            MarketUI.print_warning(f"Failed to update {failed} items")
-        MarketUI.print_dim("Tip: Schedule this command daily via cron/Task Scheduler")
-    
-    @staticmethod
     def show_top_items(world: str, items: List[Dict], format_time_func):
         """Display top items table."""
         if not items:
@@ -200,19 +140,6 @@ class MarketUI:
             price_change = trends['price_change']
             price_emoji = "💰" if price_change > 0 else "💸"
             console.print(f"{price_emoji} Price trend: {price_change:+.1f}%")
-    
-    @staticmethod
-    def show_tracked_summary(by_world: Dict[str, List[Dict]]):
-        """Display tracked items summary."""
-        if not by_world:
-            MarketUI.print_warning("No items being tracked. Run 'init-tracking' first.")
-            return
-        
-        console.print(f"\n[bold cyan]Tracked Items Summary[/bold cyan]\n")
-        
-        for world, items in sorted(by_world.items()):
-            console.print(f"[bold]{world}[/bold]: {len(items)} items")
-            console.print(f"[dim]Last updated: {items[0]['last_updated']}[/dim]\n")
 
     @staticmethod
     def show_tracked_worlds(worlds: List[Dict]):

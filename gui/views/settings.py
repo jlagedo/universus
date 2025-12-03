@@ -1,5 +1,5 @@
 """
-Settings views (sync items, tracked worlds).
+Settings views (import static data, tracked worlds).
 """
 
 import asyncio
@@ -8,8 +8,8 @@ from ..components.cards import progress_card, warning_card, success_card
 from ..utils.icons import GameIcons
 
 
-def render_sync_items(db, dark_mode: bool = False):
-    """Render sync items view.
+def render_import_static_data(db, dark_mode: bool = False):
+    """Render import static data view.
     
     Args:
         db: Database instance
@@ -18,25 +18,29 @@ def render_sync_items(db, dark_mode: bool = False):
     Returns:
         progress_container for updates
     """
-    ui.label('Sync Item Names').classes('text-2xl font-bold mb-4')
-    ui.label('Download and sync item names from FFXIV Teamcraft.').classes('text-gray-500 mb-4')
+    ui.label('Import Static Data').classes('text-2xl font-bold mb-4')
+    ui.label('Download item names and marketable items data.').classes('text-gray-500 mb-4')
     
-    current_count = db.get_items_count()
+    items_count = db.get_items_count()
+    marketable_count = db.get_marketable_items_count()
     
     with ui.card().classes('w-full max-w-xl'):
-        ui.label('Item Database').classes('text-lg font-semibold mb-2')
-        ui.label(f'Current items in database: {current_count:,}').classes('text-gray-600')
+        ui.label('Static Data').classes('text-lg font-semibold mb-2')
+        ui.label(f'Item names in database: {items_count:,}').classes('text-gray-600')
+        ui.label(f'Marketable items in database: {marketable_count:,}').classes('text-gray-600')
         
-        ui.label('This will fetch ~47,000 item names from FFXIV Teamcraft and update the local database.').classes('text-sm text-gray-500 mt-2')
-        ui.label('Any existing items will be replaced.').classes('text-sm text-gray-400')
+        ui.label('This will fetch:').classes('text-sm text-gray-500 mt-4')
+        ui.label('• ~47,000 item names from FFXIV Teamcraft').classes('text-sm text-gray-500 ml-2')
+        ui.label('• ~30,000 marketable item IDs from Universalis API').classes('text-sm text-gray-500 ml-2')
+        ui.label('Any existing data will be replaced.').classes('text-sm text-gray-400 mt-2')
         
         progress_container = ui.column().classes('w-full mt-4')
     
     return progress_container
 
 
-async def execute_sync_items(service, progress_container, set_status):
-    """Execute item sync.
+async def execute_import_static_data(service, progress_container, set_status):
+    """Execute static data import.
     
     Args:
         service: Market service instance
@@ -47,23 +51,28 @@ async def execute_sync_items(service, progress_container, set_status):
         progress_container.clear()
         
         with ui.card().classes('w-full bg-blue-50'):
-            ui.label('Syncing items...').classes('text-blue-700 font-semibold')
+            ui.label('Importing static data...').classes('text-blue-700 font-semibold')
             ui.linear_progress(show_value=False).props('indeterminate')
-            ui.label('Fetching from FFXIV Teamcraft (running in background, this may take a moment)...').classes('text-sm text-blue-600')
+            status_label = ui.label('Fetching item names from FFXIV Teamcraft...').classes('text-sm text-blue-600')
         
-        set_status('Syncing items...')
+        set_status('Importing static data...')
         
         try:
-            count = await service.sync_items_database_async()
+            # Sync item names
+            items_count = await service.sync_items_database_async()
+            status_label.set_text(f'Synced {items_count:,} items. Fetching marketable items from Universalis...')
+            
+            # Sync marketable items
+            marketable_count = await service.sync_marketable_items_async()
             
             await asyncio.sleep(0.5)
             progress_container.clear()
             
             with progress_container:
-                success_card(f'Successfully synced {count:,} items to local database')
+                success_card(f'Imported {items_count:,} item names and {marketable_count:,} marketable items')
             
             set_status('Ready')
-            ui.notify(f'Synced {count:,} items', type='positive')
+            ui.notify(f'Imported static data successfully', type='positive')
             
         except Exception as e:
             progress_container.clear()

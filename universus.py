@@ -98,74 +98,6 @@ def datacenters(ctx):
 
 
 @cli.command()
-@click.option('--world', required=True, help='World name (e.g., Behemoth)')
-@click.option('--limit', default=None, type=int, help='Number of top items to track')
-@click.pass_context
-def init_tracking(ctx, world, limit):
-    """Initialize tracking for top volume items on a world."""
-    if limit is None:
-        limit = config.get('cli', 'default_tracking_limit', 50)
-    logger.info(f"Executing 'init-tracking' command for {world} (limit: {limit})")
-    service = ctx.obj['SERVICE']
-    
-    MarketUI.show_init_tracking_header(world, limit)
-    
-    try:
-        # Get most recently updated items
-        with MarketUI.show_status("Fetching items..."):
-            pass
-        
-        with MarketUI.show_init_tracking_progress(limit) as progress:
-            task = progress.add_task("Analyzing items...", total=limit)
-            
-            # Initialize tracking and get results
-            top_items, total_found, items_with_sales = service.initialize_tracking(world, limit)
-            
-            # Update progress to complete
-            progress.update(task, completed=limit)
-        
-        if not top_items:
-            MarketUI.print_warning(f"No items with sales data found for {world}")
-            return
-        
-        MarketUI.show_init_tracking_results(world, top_items, ctx.obj['DB_PATH'])
-        
-    except Exception as e:
-        logger.error(f"Init tracking failed: {e}", exc_info=True)
-        MarketUI.exit_with_error(str(e))
-
-
-@cli.command()
-@click.option('--world', required=True, help='World name to update')
-@click.pass_context
-def update(ctx, world):
-    """Update market data for all tracked items on a world."""
-    logger.info(f"Executing 'update' command for {world}")
-    service = ctx.obj['SERVICE']
-    db = ctx.obj['DB']
-    
-    # Get tracked items count for display
-    tracked_count = db.get_tracked_items_count(world)
-    
-    if tracked_count == 0:
-        MarketUI.print_warning(f"No items being tracked for {world}. Run 'init-tracking' first.")
-        return
-    
-    MarketUI.show_update_header(world, tracked_count)
-    
-    with MarketUI.show_update_progress(tracked_count) as progress:
-        task = progress.add_task("Fetching market data...", total=tracked_count)
-        
-        # Update items (service handles the actual query)
-        successful, failed, _ = service.update_tracked_items(world)
-        
-        # Update progress to complete
-        progress.update(task, completed=tracked_count)
-    
-    MarketUI.show_update_results(successful, failed)
-
-
-@cli.command()
 @click.option('--world', required=True, help='World name')
 @click.option('--limit', default=None, type=int, help='Number of top items to show')
 @click.pass_context
@@ -207,58 +139,39 @@ def report(ctx, world, item_id, days):
         MarketUI.show_trends(trends)
 
 
-@cli.command()
+@cli.command(name='import-static-data')
 @click.pass_context
-def list_tracked(ctx):
-    """List all tracked items across all worlds."""
-    logger.info("Executing 'list-tracked' command")
-    service = ctx.obj['SERVICE']
+def import_static_data(ctx):
+    """Import static data: item names and marketable items.
     
-    by_world = service.get_all_tracked_items()
-    MarketUI.show_tracked_summary(by_world)
-
-
-@cli.command()
-@click.pass_context
-def sync_items(ctx):
-    """Sync item names from FFXIV Teamcraft data dump.
+    This command fetches:
+    1. Item names from FFXIV Teamcraft data dump
+    2. Marketable item IDs from Universalis API
     
-    This command fetches the latest item database from FFXIV Teamcraft
-    and updates the local database. Any existing items will be replaced.
+    Any existing data will be replaced.
     """
-    logger.info("Executing 'sync-items' command")
+    logger.info("Executing 'import-static-data' command")
     service = ctx.obj['SERVICE']
     
     try:
-        with MarketUI.show_status("Fetching items from FFXIV Teamcraft (this may take a moment)..."):
-            count = service.sync_items_database()
+        # Sync item names
+        with MarketUI.show_status("Fetching items from FFXIV Teamcraft..."):
+            items_count = service.sync_items_database()
+        MarketUI.print_success(f"Synced {items_count:,} item names")
         
-        MarketUI.print_success(f"Successfully synced {count:,} items to local database")
-    except Exception as e:
-        logger.error(f"Failed to sync items: {e}")
-        MarketUI.exit_with_error(f"Failed to sync items: {str(e)}")
-
-
-@cli.command()
-@click.pass_context
-def sync_marketable(ctx):
-    """Sync marketable items from Universalis API.
-    
-    This command downloads all marketable item IDs from the Universalis API
-    and stores them in the local database. Any existing marketable items data
-    will be cleared first.
-    """
-    logger.info("Executing 'sync-marketable' command")
-    service = ctx.obj['SERVICE']
-    
-    try:
+        # Sync marketable items
         with MarketUI.show_status("Downloading marketable items from Universalis API..."):
-            count = service.sync_marketable_items()
+            marketable_count = service.sync_marketable_items()
+        MarketUI.print_success(f"Synced {marketable_count:,} marketable items")
         
-        MarketUI.print_success(f"Successfully synced {count:,} marketable items to local database")
+        MarketUI.print_success(f"Static data import complete: {items_count:,} items, {marketable_count:,} marketable")
     except Exception as e:
-        logger.error(f"Failed to sync marketable items: {e}")
-        MarketUI.exit_with_error(f"Failed to sync marketable items: {str(e)}")
+        logger.error(f"Failed to import static data: {e}")
+        MarketUI.exit_with_error(f"Failed to import static data: {str(e)}")
+
+
+# Alias for import-static-data
+cli.add_command(import_static_data, name='isd')
 
 
 @cli.group(name='tracked-worlds')

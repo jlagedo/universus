@@ -250,6 +250,7 @@ class TestUniversusGUIDataLoading:
         gui_instance.service.get_datacenters.return_value = [
             {'name': 'Aether', 'region': 'NA', 'worlds': [73, 79]}
         ]
+        gui_instance.service.list_tracked_worlds.return_value = []
         
         # Mock session response for API check
         mock_response = Mock()

@@ -85,81 +85,6 @@ class TestCLI:
     @patch('universus.MarketDatabase')
     @patch('universus.UniversalisAPI')
     @patch('universus.MarketService')
-    def test_init_tracking_command(self, mock_service_cls, mock_api_cls, mock_db_cls, runner):
-        """Test init-tracking command."""
-        mock_service = Mock()
-        mock_service.initialize_tracking.return_value = (
-            [{'item_id': 12345, 'velocity': 10.0, 'avg_price': 1000}],
-            1,
-            1
-        )
-        mock_service_cls.return_value = mock_service
-        mock_db_cls.return_value = Mock()
-        mock_api_cls.return_value = Mock()
-        
-        result = runner.invoke(cli, ['init-tracking', '--world', 'Behemoth', '--limit', '10'])
-        
-        assert result.exit_code == 0
-        mock_service.initialize_tracking.assert_called_once_with('Behemoth', 10)
-    
-    @patch('universus.MarketDatabase')
-    @patch('universus.UniversalisAPI')
-    @patch('universus.MarketService')
-    def test_init_tracking_no_items(self, mock_service_cls, mock_api_cls, mock_db_cls, runner):
-        """Test init-tracking command with no items found."""
-        mock_service = Mock()
-        mock_service.initialize_tracking.return_value = ([], 0, 0)
-        mock_service_cls.return_value = mock_service
-        mock_db_cls.return_value = Mock()
-        mock_api_cls.return_value = Mock()
-        
-        result = runner.invoke(cli, ['init-tracking', '--world', 'Behemoth'])
-        
-        assert result.exit_code == 0
-        # Should print warning about no items found
-    
-    @patch('universus.MarketDatabase')
-    @patch('universus.UniversalisAPI')
-    @patch('universus.MarketService')
-    def test_update_command(self, mock_service_cls, mock_api_cls, mock_db_cls, runner):
-        """Test update command."""
-        mock_db = Mock()
-        mock_db.get_tracked_items_count.return_value = 5
-        mock_db_cls.return_value = mock_db
-        
-        mock_service = Mock()
-        mock_service.update_tracked_items.return_value = (5, 0, [])
-        mock_service_cls.return_value = mock_service
-        
-        mock_api_cls.return_value = Mock()
-        
-        result = runner.invoke(cli, ['update', '--world', 'Behemoth'])
-        
-        assert result.exit_code == 0
-        mock_service.update_tracked_items.assert_called_once_with('Behemoth')
-    
-    @patch('universus.MarketDatabase')
-    @patch('universus.UniversalisAPI')
-    @patch('universus.MarketService')
-    def test_update_command_no_tracked_items(self, mock_service_cls, mock_api_cls, mock_db_cls, runner):
-        """Test update command when no items are tracked."""
-        mock_db = Mock()
-        mock_db.get_tracked_items_count.return_value = 0
-        mock_db_cls.return_value = mock_db
-        
-        mock_service = Mock()
-        mock_service_cls.return_value = mock_service
-        mock_api_cls.return_value = Mock()
-        
-        result = runner.invoke(cli, ['update', '--world', 'Behemoth'])
-        
-        assert result.exit_code == 0
-        # Service should not be called
-        mock_service.update_tracked_items.assert_not_called()
-    
-    @patch('universus.MarketDatabase')
-    @patch('universus.UniversalisAPI')
-    @patch('universus.MarketService')
     def test_top_command(self, mock_service_cls, mock_api_cls, mock_db_cls, runner):
         """Test top command."""
         mock_service = Mock()
@@ -228,52 +153,51 @@ class TestCLI:
     @patch('universus.MarketDatabase')
     @patch('universus.UniversalisAPI')
     @patch('universus.MarketService')
-    def test_list_tracked_command(self, mock_service_cls, mock_api_cls, mock_db_cls, runner):
-        """Test list-tracked command."""
-        mock_service = Mock()
-        mock_service.get_all_tracked_items.return_value = {
-            'Behemoth': [
-                {'item_id': 12345, 'last_updated': '2025-12-01 00:00:00'}
-            ]
-        }
-        mock_service_cls.return_value = mock_service
-        mock_db_cls.return_value = Mock()
-        mock_api_cls.return_value = Mock()
-        
-        result = runner.invoke(cli, ['list-tracked'])
-        
-        assert result.exit_code == 0
-        mock_service.get_all_tracked_items.assert_called_once()
-    
-    @patch('universus.MarketDatabase')
-    @patch('universus.UniversalisAPI')
-    @patch('universus.MarketService')
-    def test_sync_items_command(self, mock_service_cls, mock_api_cls, mock_db_cls, runner):
-        """Test sync-items command."""
+    def test_import_static_data_command(self, mock_service_cls, mock_api_cls, mock_db_cls, runner):
+        """Test import-static-data command."""
         mock_service = Mock()
         mock_service.sync_items_database.return_value = 47000
+        mock_service.sync_marketable_items.return_value = 30000
         mock_service_cls.return_value = mock_service
         mock_db_cls.return_value = Mock()
         mock_api_cls.return_value = Mock()
         
-        result = runner.invoke(cli, ['sync-items'])
+        result = runner.invoke(cli, ['import-static-data'])
         
         assert result.exit_code == 0
         mock_service.sync_items_database.assert_called_once()
-        assert '47,000' in result.output or '47000' in result.output
+        mock_service.sync_marketable_items.assert_called_once()
     
     @patch('universus.MarketDatabase')
     @patch('universus.UniversalisAPI')
     @patch('universus.MarketService')
-    def test_sync_items_command_error(self, mock_service_cls, mock_api_cls, mock_db_cls, runner):
-        """Test sync-items command with error."""
+    def test_import_static_data_alias(self, mock_service_cls, mock_api_cls, mock_db_cls, runner):
+        """Test isd alias for import-static-data."""
+        mock_service = Mock()
+        mock_service.sync_items_database.return_value = 47000
+        mock_service.sync_marketable_items.return_value = 30000
+        mock_service_cls.return_value = mock_service
+        mock_db_cls.return_value = Mock()
+        mock_api_cls.return_value = Mock()
+        
+        result = runner.invoke(cli, ['isd'])
+        
+        assert result.exit_code == 0
+        mock_service.sync_items_database.assert_called_once()
+        mock_service.sync_marketable_items.assert_called_once()
+    
+    @patch('universus.MarketDatabase')
+    @patch('universus.UniversalisAPI')
+    @patch('universus.MarketService')
+    def test_import_static_data_error(self, mock_service_cls, mock_api_cls, mock_db_cls, runner):
+        """Test import-static-data command with error."""
         mock_service = Mock()
         mock_service.sync_items_database.side_effect = Exception("Network Error")
         mock_service_cls.return_value = mock_service
         mock_db_cls.return_value = Mock()
         mock_api_cls.return_value = Mock()
         
-        result = runner.invoke(cli, ['sync-items'])
+        result = runner.invoke(cli, ['import-static-data'])
         
         # Should exit with error
         assert result.exit_code != 0
@@ -300,40 +224,15 @@ class TestCLI:
         mock_api_cls.return_value = mock_api
         
         mock_service = Mock()
-        mock_service.get_all_tracked_items.return_value = {}
+        mock_service.sync_items_database.return_value = 1000
+        mock_service.sync_marketable_items.return_value = 500
         mock_service_cls.return_value = mock_service
         
-        result = runner.invoke(cli, ['list-tracked'])
+        result = runner.invoke(cli, ['import-static-data'])
         
         # Verify cleanup was called
         mock_db.close.assert_called_once()
         mock_api.close.assert_called_once()
-
-
-class TestWorldNameValidation:
-    """Test world name validation in API calls."""
-    
-    @pytest.fixture
-    def runner(self):
-        """Create a Click CLI runner."""
-        return CliRunner()
-    
-    @patch('universus.MarketDatabase')
-    @patch('universus.UniversalisAPI')
-    @patch('universus.MarketService')
-    def test_init_tracking_with_valid_world(self, mock_service_cls, mock_api_cls, mock_db_cls, runner):
-        """Test that valid world names are accepted."""
-        mock_service = Mock()
-        mock_service.initialize_tracking.return_value = ([], 0, 0)
-        mock_service_cls.return_value = mock_service
-        mock_db_cls.return_value = Mock()
-        mock_api_cls.return_value = Mock()
-        
-        # Test various valid world names
-        valid_worlds = ['Behemoth', 'Excalibur', 'Coeurl', 'Faerie']
-        for world in valid_worlds:
-            result = runner.invoke(cli, ['init-tracking', '--world', world])
-            assert result.exit_code == 0, f"Failed for world: {world}"
 
 
 class TestDatabaseIntegration:
@@ -349,10 +248,11 @@ class TestDatabaseIntegration:
     def test_cli_with_memory_db(self, mock_service_cls, mock_api_cls, runner):
         """Test CLI with in-memory database."""
         mock_service = Mock()
-        mock_service.get_all_tracked_items.return_value = {}
+        mock_service.sync_items_database.return_value = 1000
+        mock_service.sync_marketable_items.return_value = 500
         mock_service_cls.return_value = mock_service
         mock_api_cls.return_value = Mock()
         
-        result = runner.invoke(cli, ['--db-path', ':memory:', 'list-tracked'])
+        result = runner.invoke(cli, ['--db-path', ':memory:', 'import-static-data'])
         
         assert result.exit_code == 0

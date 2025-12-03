@@ -56,30 +56,6 @@ class Sidebar:
                 ).classes('w-full justify-start').props('flat align=left')
                 
                 ui.separator()
-                ui.label('Tracking').classes(section_label_class)
-                
-                # Tracked Items
-                ui.button(
-                    'Tracked Items',
-                    icon=GameIcons.TRACK,
-                    on_click=lambda: on_view_change('tracked')
-                ).classes('w-full justify-start').props('flat align=left')
-                
-                # Init Tracking
-                ui.button(
-                    'Initialize Tracking',
-                    icon=GameIcons.ADD,
-                    on_click=lambda: on_view_change('init_tracking')
-                ).classes('w-full justify-start').props('flat align=left')
-                
-                # Update
-                ui.button(
-                    'Update Data',
-                    icon=GameIcons.SYNC,
-                    on_click=lambda: on_view_change('update')
-                ).classes('w-full justify-start').props('flat align=left')
-                
-                ui.separator()
                 ui.label('Analysis').classes(section_label_class)
                 
                 # Item Report
@@ -106,11 +82,11 @@ class Sidebar:
                 ui.separator()
                 ui.label('Settings').classes(section_label_class)
                 
-                # Sync Items
+                # Import Static Data
                 ui.button(
-                    'Sync Item Names',
+                    'Import Static Data',
                     icon=GameIcons.CLOUD_DOWNLOAD,
-                    on_click=lambda: on_view_change('sync_items')
+                    on_click=lambda: on_view_change('import_static_data')
                 ).classes('w-full justify-start').props('flat align=left')
                 
                 # Tracked Worlds

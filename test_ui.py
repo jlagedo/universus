@@ -88,53 +88,6 @@ class TestMarketUI:
         # Should print table and summary
         assert mock_console.print.call_count >= 2
     
-    def test_show_init_tracking_header(self, mock_console):
-        """Test showing init tracking header."""
-        MarketUI.show_init_tracking_header('Behemoth', 50)
-        
-        # Should print header and rate limit info
-        assert mock_console.print.call_count == 2
-        
-        # Check that world name is in output
-        calls = [str(call[0][0]) for call in mock_console.print.call_args_list]
-        assert any('Behemoth' in call for call in calls)
-    
-    def test_show_init_tracking_results(self, mock_console):
-        """Test showing init tracking results."""
-        top_items = [
-            {'item_id': 12345, 'velocity': 10.5, 'avg_price': 1000},
-            {'item_id': 67890, 'velocity': 5.2, 'avg_price': 2000}
-        ]
-        
-        MarketUI.show_init_tracking_results('Behemoth', top_items, 'market_data.db')
-        
-        # Should print info, table, success, and dim messages
-        assert mock_console.print.call_count >= 3
-    
-    def test_show_update_header(self, mock_console):
-        """Test showing update header."""
-        MarketUI.show_update_header('Behemoth', 10)
-        
-        # Should print header and rate limit info
-        assert mock_console.print.call_count == 2
-        
-        calls = [str(call[0][0]) for call in mock_console.print.call_args_list]
-        assert any('10 items' in call for call in calls)
-    
-    def test_show_update_results_success_only(self, mock_console):
-        """Test showing update results with only successes."""
-        MarketUI.show_update_results(10, 0)
-        
-        # Should show success and tip
-        assert mock_console.print.call_count >= 2
-    
-    def test_show_update_results_with_failures(self, mock_console):
-        """Test showing update results with failures."""
-        MarketUI.show_update_results(8, 2)
-        
-        # Should show success, warning, and tip
-        assert mock_console.print.call_count >= 3
-    
     def test_show_top_items_empty(self, mock_console):
         """Test showing top items with no data."""
         MarketUI.show_top_items('Behemoth', [], lambda x: "1h ago")
@@ -278,30 +231,6 @@ class TestMarketUI:
         
         # Should not print anything
         mock_console.print.assert_not_called()
-    
-    def test_show_tracked_summary_empty(self, mock_console):
-        """Test showing empty tracked summary."""
-        MarketUI.show_tracked_summary({})
-        
-        # Should print warning
-        assert mock_console.print.called
-    
-    def test_show_tracked_summary_with_data(self, mock_console):
-        """Test showing tracked summary with data."""
-        by_world = {
-            'Behemoth': [
-                {'item_id': 12345, 'last_updated': '2025-12-01 00:00:00'},
-                {'item_id': 67890, 'last_updated': '2025-12-01 00:00:00'}
-            ],
-            'Excalibur': [
-                {'item_id': 11111, 'last_updated': '2025-12-01 00:00:00'}
-            ]
-        }
-        
-        MarketUI.show_tracked_summary(by_world)
-        
-        # Should print header and info for each world
-        assert mock_console.print.call_count >= 5
     
     def test_exit_with_error(self, mock_console):
         """Test exit with error."""
