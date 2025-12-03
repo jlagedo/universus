@@ -5,8 +5,9 @@ Database layer for market data storage and retrieval.
 import sqlite3
 import logging
 import threading
+import json
 from datetime import datetime, timedelta
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Any
 
 from config import get_config
 
@@ -481,6 +482,15 @@ class MarketDatabase:
         
         Skips inserts that already exist for the same day due to UNIQUE constraint.
         """
+        def get_nested(d, *keys):
+            """Safely get nested dictionary values."""
+            try:
+                for k in keys:
+                    d = d.get(k, {})
+                return d
+            except AttributeError:
+                return {}
+        
         with self._lock:
             cursor = self.conn.cursor()
             now = datetime.now().isoformat(sep=' ')
@@ -488,13 +498,6 @@ class MarketDatabase:
                 item_id = item.get('itemId')
                 nq = item.get('nq', {})
                 hq = item.get('hq', {})
-                def get_nested(d, *keys):
-                    try:
-                        for k in keys:
-                            d = d.get(k, {})
-                        return d
-                    except AttributeError:
-                        return {}
                 cursor.execute(
                     """
                     INSERT OR IGNORE INTO current_prices (
@@ -556,7 +559,7 @@ class MarketDatabase:
         """Return a set of item_ids already updated today for the tracked world."""
         cursor = self.conn.cursor()
         cursor.execute(
-            "SELECT item_id FROM current_prices WHERE tracked_world_id = ? AND date(fetched_at) = date('now')",
+            "SELECT item_id FROM current_prices WHERE tracked_world_id = ? AND strftime('%Y-%m-%d', fetched_at) = strftime('%Y-%m-%d', 'now', 'localtime')",
             (tracked_world_id,)
         )
         return {row[0] for row in cursor.fetchall()}
@@ -622,7 +625,6 @@ class MarketDatabase:
             for dc in datacenters:
                 try:
                     # Convert worlds list to JSON string
-                    import json
                     worlds_json = json.dumps(dc.get('worlds', []))
                     
                     cursor.execute(
@@ -664,7 +666,6 @@ class MarketDatabase:
             return None
         
         # Convert back to list of dicts
-        import json
         datacenters = []
         for row in rows:
             datacenters.append({
@@ -745,7 +746,7 @@ class MarketDatabase:
         logger.info(f"Retrieved {len(worlds)} worlds from cache")
         return worlds
     
-    def get_cache_status(self) -> Dict[str, any]:
+    def get_cache_status(self) -> Dict[str, Any]:
         """Get status of all caches.
         
         Returns:
@@ -837,7 +838,7 @@ class MarketDatabase:
             FROM current_prices cp
             LEFT JOIN items i ON cp.item_id = i.item_id
             WHERE cp.tracked_world_id = ?
-            AND date(cp.fetched_at) = date('now')
+            AND strftime('%Y-%m-%d', cp.fetched_at) = strftime('%Y-%m-%d', 'now', 'localtime')
             AND cp.hq_world_daily_velocity IS NOT NULL
             ORDER BY cp.hq_world_daily_velocity DESC
             LIMIT ?
@@ -846,7 +847,7 @@ class MarketDatabase:
         )
         return [dict(row) for row in cursor.fetchall()]
     
-    def get_datacenter_gil_volume(self, world_id: int) -> Dict[str, any]:
+    def get_datacenter_gil_volume(self, world_id: int) -> Dict[str, Any]:
         """Get total gil volume for a datacenter (sum of all items for today).
         
         Args:
@@ -864,7 +865,7 @@ class MarketDatabase:
                 COUNT(*) as item_count
             FROM current_prices
             WHERE tracked_world_id = ?
-            AND date(fetched_at) = date('now')
+            AND strftime('%Y-%m-%d', fetched_at) = strftime('%Y-%m-%d', 'now', 'localtime')
             """,
             (world_id,)
         )

@@ -157,6 +157,56 @@ This command:
 
 **Note**: This is a one-time setup command, but can be run periodically to get updated item names from game patches.
 
+### 8. Sync marketable items
+
+Download all marketable item IDs from the Universalis API:
+
+```bash
+python universus.py sync-marketable
+```
+
+This command stores all marketable item IDs in the local database for reference.
+
+### 9. Manage tracked worlds
+
+Track multiple worlds for market data:
+
+```bash
+# List all tracked worlds
+python universus.py tracked-worlds list
+
+# Add a world
+python universus.py tracked-worlds add --world Behemoth
+
+# Remove a world
+python universus.py tracked-worlds remove --world-id 99
+
+# Clear all tracked worlds
+python universus.py tracked-worlds clear
+```
+
+### 10. Refresh cache
+
+Manually refresh cached datacenter and world data:
+
+```bash
+python universus.py refresh-cache
+```
+
+### 11. Update current prices
+
+Update aggregated prices for all marketable items on tracked worlds:
+
+```bash
+python universus.py update-current-prices
+```
+
+This command:
+- Reads marketable items and tracked worlds from the database
+- Fetches current prices in batches of 100 items per world
+- Stores results in the `current_prices` table
+- Skips items already updated today
+
 ## Configuration
 
 The application reads defaults from `config.toml`. You can override per-run using CLI flags, or point to another config with `--config-file`.
@@ -174,15 +224,22 @@ This tool implements respectful rate limiting based on official Universalis API 
 - **API Limit**: 25 requests/second sustained (50 req/s burst)
 - **Our Rate**: 20 requests/second (80% of limit for safety)
 - **Algorithm**: Token bucket with burst support
+- **Default**: 2.0 seconds between requests (configurable via `config.toml`)
 - **Impact**: Updating 50 items takes ~2.5 seconds
 
 ## Database Structure
 
 The local SQLite database (`market_data.db`) contains:
 
-- **tracked_items**: Items being monitored
+- **tracked_items**: Items being monitored per world
 - **daily_snapshots**: Daily market data snapshots
 - **sales_history**: Individual sale transactions
+- **items**: Item names database (from FFXIV Teamcraft)
+- **marketable_items**: List of all marketable item IDs
+- **tracked_worlds**: Configuration of worlds to track
+- **current_prices**: Current aggregated prices per world
+- **datacenters_cache**: Cached datacenter data
+- **worlds_cache**: Cached world data
 
 ## Example Workflow
 
@@ -225,7 +282,7 @@ pytest
 python run_tests.py --coverage --verbose
 ```
 
-**Test Coverage**: 98 tests, 67% overall coverage
+**Test Coverage**: 174 tests across 7 test modules, 2560+ lines of test code
 
 ### Architecture
 

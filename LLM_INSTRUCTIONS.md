@@ -10,18 +10,41 @@ Universus is a Python application for tracking Final Fantasy XIV market prices w
 
 - **Language**: Python 3.7+
 - **Architecture**: Layered (CLI/GUI → UI → Service → API/Database)
-- **Testing**: pytest (98 tests, 67% coverage)
-- **Database**: SQLite with thread-safety
-- **GUI**: NiceGUI with async operations
+- **Testing**: pytest (174 tests across 7 modules, 2560+ lines)
+- **Database**: SQLite with thread-safety (9 tables)
+- **GUI**: NiceGUI with modular component-based architecture
 - **API**: Universalis API with rate limiting (20 req/s, token bucket)
+- **Version**: 1.0.0
+
+## Available CLI Commands
+
+**Data Management:**
+- `datacenters` - List all FFXIV datacenters and worlds
+- `init-tracking` - Initialize tracking for top volume items on a world
+- `update` - Update market data for tracked items (daily)
+- `top` - View top items by volume
+- `report` - Detailed item report with trends
+- `list-tracked` - List all tracked items
+
+**Synchronization:**
+- `sync-items` - Sync item names from FFXIV Teamcraft (~47k items)
+- `sync-marketable` - Sync marketable item IDs from Universalis API
+- `update-current-prices` - Update aggregated prices for all marketable items on tracked worlds
+
+**Configuration:**
+- `tracked-worlds list` - List all tracked worlds
+- `tracked-worlds add` - Add a world to track
+- `tracked-worlds remove` - Remove a tracked world
+- `tracked-worlds clear` - Clear all tracked worlds
+- `refresh-cache` - Manually refresh datacenter/world cache
 
 ## File Structure & Responsibilities
 
 ### Entry Points
 - `universus.py` - CLI application (Click framework)
-- `gui.py` - Web GUI (NiceGUI framework)
 - `run_gui.py` - GUI launcher
 - `run_tests.py` - Test runner
+- `validate_gui.py` - GUI validation script
 
 ### Core Layers
 - `ui.py` - Terminal formatting (Rich library)
@@ -30,8 +53,15 @@ Universus is a Python application for tracking Final Fantasy XIV market prices w
 - `api_client.py` - HTTP client with rate limiting
 - `config.py` - TOML configuration loader
 
+### GUI (Modular Architecture)
+- `gui/app.py` - Main application coordinator
+- `gui/state.py` - Application state management
+- `gui/components/` - Reusable UI components (header, sidebar, footer, cards)
+- `gui/views/` - Page controllers (dashboard, tracking, reports, settings)
+- `gui/utils/` - Utilities (formatters, theme)
+
 ### Testing
-- `test_*.py` - Unit tests for each module
+- `test_*.py` - Unit tests for each module (174 tests, 2560+ lines)
 - `pytest.ini` - Test configuration
 - All tests use in-memory database (`:memory:`)
 - Mocks used for external dependencies
@@ -211,28 +241,51 @@ def show_new_data(data):
 
 ### Adding a GUI View
 
-1. **Add view method to `gui.py`**:
+1. **Create view module in `gui/views/new_view.py`**:
 ```python
-def render_new_view(self):
-    """Render new view."""
-    with ui.card():
-        ui.label('New Feature')
+from nicegui import ui
+import logging
+
+logger = logging.getLogger(__name__)
+
+async def render(app):
+    """Render the new view."""
+    with ui.card().classes('w-full'):
+        ui.label('New Feature').classes('text-2xl font-bold')
         
         async def on_action():
             try:
-                result = await service.operation_async(params)
+                app.set_status('Processing...')
+                result = await app.service.operation_async(params)
                 ui.notify('Success!', type='positive')
             except Exception as e:
+                logger.error(f'Error: {e}')
                 ui.notify(f'Error: {e}', type='negative')
+            finally:
+                app.set_status('Ready')
         
         ui.button('Action', on_click=on_action)
 ```
 
-2. **Add to navigation** (if needed):
+2. **Import and register in `gui/views/__init__.py`**:
 ```python
-def render_sidebar(self):
-    with ui.column():
-        ui.button('New View', on_click=self.render_new_view)
+from . import new_view
+
+# Add to exports if needed
+```
+
+3. **Add to navigation in `gui/components/sidebar.py`**:
+```python
+ui.button('New View', on_click=lambda: self.app.show_view('new_view'))
+```
+
+4. **Register view in `gui/app.py`**:
+```python
+from .views import new_view
+
+# In show_view method
+if view_name == 'new_view':
+    await new_view.render(self)
 ```
 
 ### Adding Tests
@@ -565,6 +618,7 @@ The codebase is well-structured and testable. Follow the established patterns an
 
 ---
 
-**Last Updated**: December 1, 2025
+**Last Updated**: December 2, 2025
 **For**: AI Assistants and LLMs
 **Status**: Production Ready
+**Version**: 1.0.0

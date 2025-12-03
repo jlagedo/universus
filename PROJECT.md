@@ -10,9 +10,9 @@ Universus is a Python application for tracking Final Fantasy XIV market prices u
 universus/
 ├── Core Application
 │   ├── universus.py          # CLI commands & orchestration
-│   ├── gui.py                 # NiceGUI web interface
 │   ├── run_gui.py            # GUI entry point
-│   └── run_tests.py          # Test runner
+│   ├── run_tests.py          # Test runner
+│   └── validate_gui.py       # GUI validation script
 │
 ├── Layered Architecture
 │   ├── ui.py                 # Presentation layer (Rich terminal UI)
@@ -20,22 +20,48 @@ universus/
 │   ├── database.py           # Data access layer (SQLite)
 │   └── api_client.py         # API communication & rate limiting
 │
+├── GUI (Refactored Modular Architecture)
+│   ├── gui/
+│   │   ├── __init__.py
+│   │   ├── app.py            # Main application coordinator
+│   │   ├── state.py          # Application state management
+│   │   ├── components/       # Reusable UI components
+│   │   │   ├── __init__.py
+│   │   │   ├── header.py     # Header with selectors
+│   │   │   ├── sidebar.py    # Navigation sidebar
+│   │   │   ├── footer.py     # Status footer
+│   │   │   └── cards.py      # Stat & progress cards
+│   │   ├── views/            # Page controllers
+│   │   │   ├── __init__.py
+│   │   │   ├── dashboard.py  # Dashboard view
+│   │   │   ├── datacenters.py # Datacenters list
+│   │   │   ├── top_items.py  # Top items view
+│   │   │   ├── tracked_items.py # Tracked items
+│   │   │   ├── tracking.py   # Init & update tracking
+│   │   │   ├── reports.py    # Item reports & charts
+│   │   │   └── settings.py   # Sync & settings
+│   │   └── utils/            # GUI utilities
+│   │       ├── __init__.py
+│   │       ├── formatters.py # Gil, velocity formatting
+│   │       └── theme.py      # Theme management
+│
 ├── Configuration
 │   ├── config.py             # Configuration loader
 │   └── config.toml           # Settings file
 │
-├── Tests (98 tests, 67% coverage)
-│   ├── test_cli.py
-│   ├── test_gui.py
-│   ├── test_ui.py
-│   ├── test_service.py
-│   ├── test_database.py
-│   ├── test_api_client.py
-│   └── test_items_sync.py
+├── Tests (174 tests, 2560+ lines)
+│   ├── test_cli.py           # CLI commands
+│   ├── test_gui.py           # GUI components
+│   ├── test_ui.py            # Terminal UI
+│   ├── test_service.py       # Business logic
+│   ├── test_database.py      # Database operations
+│   ├── test_api_client.py    # API client
+│   └── test_items_sync.py    # Item synchronization
 │
 └── Documentation
     ├── README.md             # User guide
     ├── PROJECT.md            # This file
+    ├── GUI_REFACTORING.md    # GUI refactoring details
     └── LLM_INSTRUCTIONS.md   # AI assistant guide
 ```
 
@@ -65,11 +91,14 @@ universus/
 - Component initialization
 - Resource cleanup
 
-**GUI Layer** (`gui.py`)
-- NiceGUI web interface
+**GUI Layer** (`gui/`)
+- Modular NiceGUI web interface
+- Component-based architecture
+- State management via `AppState`
 - Async operations with ThreadPoolExecutor
 - Responsive UI during long operations
 - Real-time progress feedback
+- Theme management (dark/light mode)
 
 **Presentation Layer** (`ui.py`)
 - Rich terminal formatting
@@ -156,6 +185,59 @@ CREATE TABLE items (
 )
 ```
 
+### marketable_items
+List of all marketable item IDs from Universalis.
+```sql
+CREATE TABLE marketable_items (
+    item_id INTEGER PRIMARY KEY
+)
+```
+
+### tracked_worlds
+Configuration of worlds to track for current prices.
+```sql
+CREATE TABLE tracked_worlds (
+    id INTEGER,
+    name TEXT,
+    PRIMARY KEY (id)
+)
+```
+
+### current_prices
+Current aggregated prices per world.
+```sql
+CREATE TABLE current_prices (
+    item_id INTEGER,
+    world_id INTEGER,
+    min_price INTEGER,
+    max_price INTEGER,
+    average_price REAL,
+    last_update DATETIME,
+    PRIMARY KEY (item_id, world_id)
+)
+```
+
+### datacenters_cache
+Cached datacenter data from API.
+```sql
+CREATE TABLE datacenters_cache (
+    name TEXT PRIMARY KEY,
+    region TEXT,
+    worlds TEXT,
+    cached_at DATETIME
+)
+```
+
+### worlds_cache
+Cached world data from API.
+```sql
+CREATE TABLE worlds_cache (
+    id INTEGER PRIMARY KEY,
+    name TEXT,
+    cached_at DATETIME
+)
+```
+
 ## Key Features
 
 ### 1. Rate Limiting
@@ -213,17 +295,20 @@ CREATE TABLE items (
 ## Testing Strategy
 
 ### Test Coverage
-- **Total Tests**: 98
-- **Coverage**: 67% overall, 100% for tested modules
+- **Total Tests**: 174
+- **Test Files**: 7 modules
+- **Lines of Test Code**: 2560+
 - **Framework**: pytest 7.0+
 
 ### Test Structure
 ```
-test_database.py     17 tests - 100% coverage
-test_api_client.py   20 tests - 100% coverage
-test_service.py      23 tests - 99% coverage
-test_ui.py           28 tests - 98% coverage
-test_items_sync.py   10 tests - 99% coverage
+test_api_client.py   35+ tests - API client & rate limiting
+test_database.py     31+ tests - Database operations
+test_service.py      20+ tests - Business logic
+test_ui.py           28+ tests - Terminal UI formatting
+test_cli.py          24+ tests - CLI commands
+test_gui.py          26+ tests - GUI components & state
+test_items_sync.py   10+ tests - Item synchronization
 ```
 
 ### Testing Patterns
@@ -308,6 +393,39 @@ python universus.py datacenters
 ```
 Shows all FFXIV datacenters and worlds.
 
+### Sync Marketable Items
+```bash
+python universus.py sync-marketable
+```
+Downloads all marketable item IDs from Universalis API.
+
+### Manage Tracked Worlds
+```bash
+# List tracked worlds
+python universus.py tracked-worlds list
+
+# Add a world
+python universus.py tracked-worlds add --world Behemoth
+
+# Remove a world
+python universus.py tracked-worlds remove --world-id 99
+
+# Clear all tracked worlds
+python universus.py tracked-worlds clear
+```
+
+### Refresh Cache
+```bash
+python universus.py refresh-cache
+```
+Manually refresh cached datacenter and world data.
+
+### Update Current Prices
+```bash
+python universus.py update-current-prices
+```
+Updates current aggregated prices for all marketable items on tracked worlds.
+
 ## GUI Interface
 
 ### Running the GUI
@@ -323,9 +441,16 @@ Starts web interface on http://localhost:8080
 - Datacenter/world selection
 - Dashboard with statistics
 - Interactive data tables
+- Dark/light theme toggle
+- Modular component-based UI
+- Multiple views (dashboard, tracking, reports, settings)
 
 ### Technical Implementation
 - Built with NiceGUI
+- Modular architecture with separation of concerns
+- Component-based UI (header, sidebar, footer, cards)
+- State management via `AppState` class
+- Theme management via `ThemeManager` class
 - Async operations using ThreadPoolExecutor
 - Thread-safe database access
 - Automatic error handling
@@ -597,6 +722,6 @@ Contributions welcome! Please:
 
 ---
 
-**Last Updated**: December 1, 2025
+**Last Updated**: December 2, 2025
 **Status**: Production Ready
-**Version**: 2.0
+**Version**: 1.0.0
