@@ -45,17 +45,22 @@ python universus.py --help
 # config.toml
 [database]
 default_path = "market_data.db"
+cache_max_age_hours = 24
 
 [api]
 base_url = "https://universalis.app/api"
 timeout = 10
-rate_limit = 2.0
+rate_limit = 20.0          # 80% of API limit (25 req/s)
+burst_size = 40            # Token bucket burst capacity
 max_items_per_query = 200
 default_history_entries = 100
+batch_size = 100           # Items per batch for price updates
+executor_workers = 3       # Thread pool workers for async ops
 
 [teamcraft]
 items_url = "https://raw.githubusercontent.com/ffxiv-teamcraft/ffxiv-teamcraft/master/libs/data/src/lib/json/items.json"
 timeout = 30
+max_retries = 3
 
 [cli]
 default_tracking_limit = 50
@@ -65,6 +70,10 @@ default_report_days = 30
 [logging]
 format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 date_format = "%Y-%m-%d %H:%M:%S"
+
+[gui]
+theme = "dark"             # 'light' or 'dark'
+port = 8080
 ```
 
 ## CLI Usage
@@ -81,41 +90,61 @@ Use a custom config:
 python universus.py --config-file ./config.toml datacenters
 ```
 
-### 2. Initialize tracking for a world
+### 2. Import static data (item names and marketable items)
 
-Track the top 50 most actively traded items on Behemoth:
+Download item names and marketable item IDs:
 
 ```bash
-python universus.py init-tracking --world Behemoth --limit 50
+python universus.py import-static-data
+# or use short alias:
+python universus.py isd
 ```
 
 This command:
-- Fetches the most recently updated items (high activity indicator)
-- Analyzes sale velocities for each item
-- Creates a local database to track these items
-- Respects API rate limits (20 requests/second with burst support)
+- Fetches ~47,000 item names from FFXIV Teamcraft
+- Fetches ~30,000 marketable item IDs from Universalis API
+- Stores them in the local database
+- Any existing data will be replaced
 
-### 3. Update tracked items (run daily)
+### 3. Manage tracked worlds
+
+Add worlds to track for price updates:
 
 ```bash
-python universus.py update --world Behemoth
+# List tracked worlds
+python universus.py tracked-worlds list
+
+# Add a world
+python universus.py tracked-worlds add --world Behemoth
+
+# Remove a world
+python universus.py tracked-worlds remove --world Behemoth
+
+# Clear all
+python universus.py tracked-worlds clear
 ```
 
-This fetches current market data and sales history for all tracked items. **Schedule this command to run daily** via:
+### 4. Update current prices (run periodically)
+
+```bash
+python universus.py update-current-prices
+```
+
+This fetches current aggregated prices for all marketable items on tracked worlds. **Schedule this command to run daily** via:
 
 **macOS/Linux (cron)**:
 ```bash
 # Run daily at 2 AM
-0 2 * * * cd /path/to/universus && python universus.py update --world Behemoth
+0 2 * * * cd /path/to/universus && python universus.py update-current-prices
 ```
 
 **Windows (Task Scheduler)**:
 ```powershell
 # Create a daily task
-schtasks /create /tn "FFXIV Market Update" /tr "python C:\path\to\universus.py update --world Behemoth" /sc daily /st 02:00
+schtasks /create /tn "FFXIV Market Update" /tr "python C:\path\to\universus.py update-current-prices" /sc daily /st 02:00
 ```
 
-### 4. View top items by volume
+### 5. View top items by volume
 
 ```bash
 python universus.py top --world Behemoth --limit 10
@@ -123,7 +152,7 @@ python universus.py top --world Behemoth --limit 10
 
 Shows the top 10 items with highest daily sales velocity.
 
-### 5. View detailed item report
+### 6. View detailed item report
 
 ```bash
 python universus.py report --world Behemoth --item-id 5594 --days 30
@@ -135,77 +164,13 @@ Shows 30-day historical data including:
 - Number of active listings
 - Percentage changes over time period
 
-### 6. List all tracked items
-
-```bash
-python universus.py list-tracked
-```
-
-### 7. Sync item names database
-
-Download and sync the complete item name database from FFXIV Teamcraft:
-
-```bash
-python universus.py sync-items
-```
-
-This command:
-- Fetches ~47,000 item names from the FFXIV Teamcraft data dump
-- Stores them in the local database for reference
-- Replaces existing data if run again (to get updates)
-- Useful for looking up item names by ID in future features
-
-**Note**: This is a one-time setup command, but can be run periodically to get updated item names from game patches.
-
-### 8. Sync marketable items
-
-Download all marketable item IDs from the Universalis API:
-
-```bash
-python universus.py sync-marketable
-```
-
-This command stores all marketable item IDs in the local database for reference.
-
-### 9. Manage tracked worlds
-
-Track multiple worlds for market data:
-
-```bash
-# List all tracked worlds
-python universus.py tracked-worlds list
-
-# Add a world
-python universus.py tracked-worlds add --world Behemoth
-
-# Remove a world
-python universus.py tracked-worlds remove --world-id 99
-
-# Clear all tracked worlds
-python universus.py tracked-worlds clear
-```
-
-### 10. Refresh cache
+### 7. Refresh cache
 
 Manually refresh cached datacenter and world data:
 
 ```bash
 python universus.py refresh-cache
 ```
-
-### 11. Update current prices
-
-Update aggregated prices for all marketable items on tracked worlds:
-
-```bash
-python universus.py update-current-prices
-```
-
-This command:
-- Reads marketable items and tracked worlds from the database
-- Fetches current prices in batches of 100 items per world
-- Stores results in the `current_prices` table
-- Skips items already updated today
 
 ## Configuration
 
@@ -223,9 +188,9 @@ This tool implements respectful rate limiting based on official Universalis API 
 
 - **API Limit**: 25 requests/second sustained (50 req/s burst)
 - **Our Rate**: 20 requests/second (80% of limit for safety)
-- **Algorithm**: Token bucket with burst support
-- **Default**: 2.0 seconds between requests (configurable via `config.toml`)
-- **Impact**: Updating 50 items takes ~2.5 seconds
+- **Algorithm**: Token bucket with burst support (40 tokens)
+- **Retry Logic**: Exponential backoff for transient errors
+- **Impact**: Updating current prices is batched at 100 items per request
 
 ## Database Structure
 
@@ -234,34 +199,39 @@ The local SQLite database (`market_data.db`) contains:
 - **tracked_items**: Items being monitored per world
 - **daily_snapshots**: Daily market data snapshots
 - **sales_history**: Individual sale transactions
-- **items**: Item names database (from FFXIV Teamcraft)
-- **marketable_items**: List of all marketable item IDs
-- **tracked_worlds**: Configuration of worlds to track
-- **current_prices**: Current aggregated prices per world
-- **datacenters_cache**: Cached datacenter data
-- **worlds_cache**: Cached world data
+- **items**: Item names database (~47k items from FFXIV Teamcraft)
+- **marketable_items**: List of all marketable item IDs (~30k from Universalis)
+- **tracked_worlds**: Configuration of worlds to track for price updates
+- **current_prices**: Current aggregated prices per tracked world (NQ/HQ at world, DC, region levels)
+- **cached_datacenters**: Cached datacenter data from API (refreshed daily)
+- **cached_worlds**: Cached world data from API (refreshed daily)
 
 ## Example Workflow
 
 ### Using the GUI
 1. Run `python run_gui.py`
-2. Select your datacenter and world
-3. Click "Initialize Tracking" to start monitoring items
-4. Use "Update Market Data" daily to refresh data
-5. View reports and statistics in the dashboard
+2. Select your datacenter and world from the header
+3. Go to Settings > Import Static Data to download item names and marketable items
+4. Go to Settings > Tracked Worlds to add worlds to track
+5. Run `python universus.py update-current-prices` via CLI to fetch prices
+6. View dashboard for market analysis and top items by HQ velocity
+7. Use Reports views for detailed item analysis and sell volume charts
 
 ### Using the CLI
 ```bash
-# 1. Initialize tracking (one-time setup)
-python universus.py init-tracking --world Behemoth --limit 50
+# 1. Import static data (one-time or periodic for updates)
+python universus.py import-static-data
 
-# 2. Update data (run daily)
-python universus.py update --world Behemoth
+# 2. Add worlds to track
+python universus.py tracked-worlds add --world Behemoth
 
-# 3. View top items
+# 3. Update prices (run daily)
+python universus.py update-current-prices
+
+# 4. View top items
 python universus.py top --world Behemoth
 
-# 4. Analyze specific item
+# 5. Analyze specific item
 python universus.py report --world Behemoth --item-id 36112 --days 30
 ```
 
@@ -282,7 +252,7 @@ pytest
 python run_tests.py --coverage --verbose
 ```
 
-**Test Coverage**: 174 tests across 7 test modules, 2560+ lines of test code
+**Test Coverage**: 162 tests across 7 test modules, 2445+ lines of test code
 
 ### Architecture
 
@@ -306,7 +276,7 @@ pip install -r requirements.txt
 
 ## About the API
 
-This application uses the [Universalis API](https://docs.universalis.app/) with respectful rate limiting (2 requests/second). 
+This application uses the [Universalis API](https://docs.universalis.app/) with respectful rate limiting (20 requests/second, 80% of API limit). 
 
 ## Database File
 

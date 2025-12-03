@@ -12,7 +12,7 @@ This document provides guidance for GitHub Copilot when working with the Univers
 - **GUI Framework**: NiceGUI 1.5.13+
 - **CLI Framework**: Click 8.0+
 - **Database**: SQLite (built-in)
-- **Testing**: pytest 7.0+
+- **Testing**: pytest 7.0+ (162 tests, 2445+ lines)
 - **Terminal UI**: Rich 13.0+
 - **Charts**: Plotly, PyEcharts
 
@@ -589,11 +589,14 @@ python run_tests.py --coverage --verbose
 ### Common Commands
 
 ```bash
-# Initialize tracking
-python universus.py init-tracking --world Behemoth --limit 50
+# Import static data (items + marketable items)
+python universus.py import-static-data
 
-# Update data (run daily)
-python universus.py update --world Behemoth
+# Add a world to track
+python universus.py tracked-worlds add --world Behemoth
+
+# Update current prices (run daily)
+python universus.py update-current-prices
 
 # View reports
 python universus.py report --world Behemoth --item-id 5594 --days 30

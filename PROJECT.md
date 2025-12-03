@@ -33,30 +33,29 @@ universus/
 │   │   │   └── cards.py      # Stat & progress cards
 │   │   ├── views/            # Page controllers
 │   │   │   ├── __init__.py
-│   │   │   ├── dashboard.py  # Dashboard view
+│   │   │   ├── dashboard.py  # Dashboard view with market analysis
 │   │   │   ├── datacenters.py # Datacenters list
 │   │   │   ├── top_items.py  # Top items view
-│   │   │   ├── tracked_items.py # Tracked items
-│   │   │   ├── tracking.py   # Init & update tracking
-│   │   │   ├── reports.py    # Item reports & charts
-│   │   │   └── settings.py   # Sync & settings
+│   │   │   ├── reports.py    # Item reports & sell volume charts
+│   │   │   └── settings.py   # Import static data & tracked worlds
 │   │   └── utils/            # GUI utilities
 │   │       ├── __init__.py
 │   │       ├── formatters.py # Gil, velocity formatting
+│   │       ├── icons.py      # GameIcons class (Material Icons)
 │   │       └── theme.py      # Theme management
 │
 ├── Configuration
 │   ├── config.py             # Configuration loader
 │   └── config.toml           # Settings file
 │
-├── Tests (174 tests, 2560+ lines)
-│   ├── test_cli.py           # CLI commands
-│   ├── test_gui.py           # GUI components
-│   ├── test_ui.py            # Terminal UI
-│   ├── test_service.py       # Business logic
-│   ├── test_database.py      # Database operations
-│   ├── test_api_client.py    # API client
-│   └── test_items_sync.py    # Item synchronization
+├── Tests (162 tests, 2445+ lines)
+│   ├── test_cli.py           # CLI commands (258 lines)
+│   ├── test_gui.py           # GUI components (471 lines)
+│   ├── test_ui.py            # Terminal UI (252 lines)
+│   ├── test_service.py       # Business logic (395 lines)
+│   ├── test_database.py      # Database operations (503 lines)
+│   ├── test_api_client.py    # API client (372 lines)
+│   └── test_items_sync.py    # Item synchronization (194 lines)
 │
 └── Documentation
     ├── README.md             # User guide
@@ -119,9 +118,15 @@ universus/
 
 **API Client** (`api_client.py`)
 - HTTP communication
-- Rate limiting (2 req/sec)
+- Rate limiting (20 req/s with token bucket algorithm)
+- Burst support (40 tokens)
 - Async operations for GUI
-- Error handling & retries
+- Error handling with exponential backoff retries
+- World name validation
+
+**Executor** (`executor.py`)
+- Shared ThreadPoolExecutor for async operations
+- Configurable worker count (default: 3)
 
 **Configuration** (`config.py`)
 - TOML file loading
@@ -197,44 +202,79 @@ CREATE TABLE marketable_items (
 Configuration of worlds to track for current prices.
 ```sql
 CREATE TABLE tracked_worlds (
-    id INTEGER,
-    name TEXT,
-    PRIMARY KEY (id)
+    world_id INTEGER PRIMARY KEY,
+    world_name TEXT,
+    added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 )
 ```
 
 ### current_prices
-Current aggregated prices per world.
+Current aggregated prices per tracked world (from Universalis aggregated API).
 ```sql
 CREATE TABLE current_prices (
-    item_id INTEGER,
-    world_id INTEGER,
-    min_price INTEGER,
-    max_price INTEGER,
-    average_price REAL,
-    last_update DATETIME,
-    PRIMARY KEY (item_id, world_id)
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tracked_world_id INTEGER NOT NULL,
+    item_id INTEGER NOT NULL,
+    fetched_at TIMESTAMP NOT NULL,
+    -- NQ prices (world, datacenter, region levels)
+    nq_world_min_price INTEGER,
+    nq_dc_min_price INTEGER,
+    nq_dc_min_world_id INTEGER,
+    nq_region_min_price INTEGER,
+    nq_region_min_world_id INTEGER,
+    nq_world_recent_price INTEGER,
+    nq_world_recent_timestamp INTEGER,
+    nq_dc_recent_price INTEGER,
+    nq_dc_recent_timestamp INTEGER,
+    nq_dc_recent_world_id INTEGER,
+    nq_region_recent_price INTEGER,
+    nq_region_recent_timestamp INTEGER,
+    nq_region_recent_world_id INTEGER,
+    nq_region_avg_price REAL,
+    nq_region_daily_velocity REAL,
+    -- HQ prices (world, datacenter, region levels)
+    hq_world_min_price INTEGER,
+    hq_dc_min_price INTEGER,
+    hq_dc_min_world_id INTEGER,
+    hq_region_min_price INTEGER,
+    hq_region_min_world_id INTEGER,
+    hq_world_recent_price INTEGER,
+    hq_world_recent_timestamp INTEGER,
+    hq_dc_recent_price INTEGER,
+    hq_dc_recent_timestamp INTEGER,
+    hq_dc_recent_world_id INTEGER,
+    hq_region_recent_price INTEGER,
+    hq_region_recent_timestamp INTEGER,
+    hq_region_recent_world_id INTEGER,
+    hq_world_avg_price REAL,
+    hq_dc_avg_price REAL,
+    hq_region_avg_price REAL,
+    hq_world_daily_velocity REAL,
+    hq_dc_daily_velocity REAL,
+    hq_region_daily_velocity REAL,
+    UNIQUE(tracked_world_id, item_id, strftime('%Y-%m-%d', fetched_at))
 )
 ```
 
 ### datacenters_cache
 Cached datacenter data from API.
 ```sql
-CREATE TABLE datacenters_cache (
-    name TEXT PRIMARY KEY,
-    region TEXT,
-    worlds TEXT,
-    cached_at DATETIME
+CREATE TABLE cached_datacenters (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE,
+    region TEXT NOT NULL,
+    worlds TEXT NOT NULL,  -- JSON array of world IDs
+    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 )
 ```
 
 ### worlds_cache
 Cached world data from API.
 ```sql
-CREATE TABLE worlds_cache (
-    id INTEGER PRIMARY KEY,
-    name TEXT,
-    cached_at DATETIME
+CREATE TABLE cached_worlds (
+    world_id INTEGER PRIMARY KEY,
+    world_name TEXT NOT NULL,
+    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 )
 ```
 
@@ -245,6 +285,7 @@ CREATE TABLE worlds_cache (
 - Token bucket algorithm with burst support (40 tokens)
 - Respects official Universalis API limits (25 req/s sustained, 50 req/s burst)
 - Provides safety margin while maximizing performance
+- Exponential backoff retry logic for transient errors
 
 ### 2. Async Operations (GUI)
 - ThreadPoolExecutor with 3 workers
@@ -295,20 +336,20 @@ CREATE TABLE worlds_cache (
 ## Testing Strategy
 
 ### Test Coverage
-- **Total Tests**: 174
+- **Total Tests**: 162
 - **Test Files**: 7 modules
-- **Lines of Test Code**: 2560+
+- **Lines of Test Code**: 2445+
 - **Framework**: pytest 7.0+
 
 ### Test Structure
 ```
-test_api_client.py   35+ tests - API client & rate limiting
-test_database.py     31+ tests - Database operations
-test_service.py      20+ tests - Business logic
-test_ui.py           28+ tests - Terminal UI formatting
-test_cli.py          24+ tests - CLI commands
-test_gui.py          26+ tests - GUI components & state
-test_items_sync.py   10+ tests - Item synchronization
+test_api_client.py   372 lines - API client & rate limiting
+test_database.py     503 lines - Database operations
+test_service.py      395 lines - Business logic
+test_ui.py           252 lines - Terminal UI formatting
+test_cli.py          258 lines - CLI commands
+test_gui.py          471 lines - GUI components & state
+test_items_sync.py   194 lines - Item synchronization
 ```
 
 ### Testing Patterns
@@ -351,17 +392,13 @@ python run_tests.py --coverage --verbose
 
 ## CLI Commands
 
-### Initialize Tracking
+### Import Static Data
 ```bash
-python universus.py init-tracking --world Behemoth --limit 50
+python universus.py import-static-data
+# or use short alias:
+python universus.py isd
 ```
-Discovers and tracks top volume items.
-
-### Update Market Data
-```bash
-python universus.py update --world Behemoth
-```
-Updates all tracked items (run daily).
+Downloads item names (~47k) from FFXIV Teamcraft and marketable item IDs (~30k) from Universalis API.
 
 ### View Top Items
 ```bash
@@ -375,29 +412,11 @@ python universus.py report --world Behemoth --item-id 5594 --days 30
 ```
 Historical analysis for specific item.
 
-### List Tracked Items
-```bash
-python universus.py list-tracked
-```
-Shows all tracked items by world.
-
-### Sync Item Names
-```bash
-python universus.py sync-items
-```
-Downloads ~47,000 item names from FFXIV Teamcraft.
-
 ### List Datacenters
 ```bash
 python universus.py datacenters
 ```
 Shows all FFXIV datacenters and worlds.
-
-### Sync Marketable Items
-```bash
-python universus.py sync-marketable
-```
-Downloads all marketable item IDs from Universalis API.
 
 ### Manage Tracked Worlds
 ```bash
@@ -435,15 +454,16 @@ python run_gui.py
 Starts web interface on http://localhost:8080
 
 ### Features
-- All CLI commands available
+- Dashboard with market analysis and top HQ velocity items
+- Datacenter/world selection
 - Real-time progress feedback
 - Responsive during operations
-- Datacenter/world selection
-- Dashboard with statistics
-- Interactive data tables
-- Dark/light theme toggle
+- Interactive data tables with pagination
+- Dark/light theme toggle (Tokyo Night theme for dark mode)
 - Modular component-based UI
-- Multiple views (dashboard, tracking, reports, settings)
+- Views: dashboard, datacenters, top items, item reports, sell volume, sell volume charts, settings
+- Import static data (items + marketable items)
+- Tracked worlds management (add/remove worlds)
 
 ### Technical Implementation
 - Built with NiceGUI
@@ -462,17 +482,22 @@ Starts web interface on http://localhost:8080
 ```toml
 [database]
 default_path = "market_data.db"
+cache_max_age_hours = 24
 
 [api]
 base_url = "https://universalis.app/api"
 timeout = 10
-rate_limit = 2.0
+rate_limit = 20.0          # 80% of API limit (25 req/s)
+burst_size = 40            # Token bucket burst capacity
 max_items_per_query = 200
 default_history_entries = 100
+batch_size = 100           # Items per batch for price updates
+executor_workers = 3       # Thread pool workers for async ops
 
 [teamcraft]
 items_url = "https://raw.githubusercontent.com/ffxiv-teamcraft/ffxiv-teamcraft/master/libs/data/src/lib/json/items.json"
 timeout = 30
+max_retries = 3
 
 [cli]
 default_tracking_limit = 50
@@ -482,6 +507,10 @@ default_report_days = 30
 [logging]
 format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 date_format = "%Y-%m-%d %H:%M:%S"
+
+[gui]
+theme = "dark"             # 'light' or 'dark'
+port = 8080
 ```
 
 ## Automation
@@ -491,13 +520,13 @@ date_format = "%Y-%m-%d %H:%M:%S"
 # Edit crontab
 crontab -e
 
-# Add daily update at 2 AM
-0 2 * * * cd /path/to/universus && python universus.py update --world Behemoth
+# Add daily price update at 2 AM
+0 2 * * * cd /path/to/universus && python universus.py update-current-prices
 ```
 
 ### Windows (Task Scheduler)
 ```powershell
-schtasks /create /tn "FFXIV Market Update" /tr "python C:\path\to\universus.py update --world Behemoth" /sc daily /st 02:00
+schtasks /create /tn "FFXIV Market Update" /tr "python C:\path\to\universus.py update-current-prices" /sc daily /st 02:00
 ```
 
 ## Dependencies
@@ -521,8 +550,8 @@ pip install -r requirements.txt
 
 ## Performance Metrics
 
-- **Init tracking (50 items)**: ~2.5 seconds (rate limited at 20 req/s)
-- **Daily update (50 items)**: ~2.5 seconds (rate limited at 20 req/s)
+- **Import static data**: ~10-15 seconds (downloads ~47k items + ~30k marketable items)
+- **Update current prices (1000 items)**: ~10 seconds per world (100 items/batch)
 - **Database growth**: ~1MB per week per 50 items
 - **Query speed**: <10ms for most operations
 - **GUI response time**: <100ms (async operations)
@@ -531,11 +560,13 @@ pip install -r requirements.txt
 
 **Base URL**: https://universalis.app/api
 
-**Rate Limit**: 2 requests/second (conservative)
+**Rate Limit**: 20 requests/second (80% of API limit for safety)
 
 **Endpoints Used**:
 - `GET /api/data-centers` - List datacenters
 - `GET /v2/worlds` - List all worlds
+- `GET /v2/marketable` - List all marketable item IDs
+- `GET /v2/aggregated/{scope}/{itemIds}` - Aggregated prices for multiple items
 - `GET /extra/stats/most-recently-updated` - Active items
 - `GET /{world}/{item_id}` - Current market data
 - `GET /history/{world}/{item_id}` - Sales history
@@ -688,7 +719,7 @@ git push origin feature/new-feature
 - [ ] WebSocket support for real-time updates
 - [ ] Caching layer for API responses
 - [ ] User preference persistence
-- [ ] Dark/light theme toggle
+- [x] Dark/light theme toggle (Tokyo Night theme)
 
 ### Technical Improvements
 - [ ] Async HTTP client (`aiohttp`)
