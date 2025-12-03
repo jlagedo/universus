@@ -5,6 +5,7 @@ Settings views (sync items, tracked worlds).
 import asyncio
 from nicegui import ui
 from ..components.cards import progress_card, warning_card, success_card
+from ..utils.icons import GameIcons
 
 
 def render_sync_items(db, dark_mode: bool = False):
@@ -140,7 +141,7 @@ def render_tracked_worlds_table(state, service, container, on_refresh):
             
             slot_html = (
                 '<q-td key="actions" :props="props">'
-                '<q-btn size="sm" flat color="negative" icon="delete" '
+                f'<q-btn size="sm" flat color="negative" icon="{GameIcons.DELETE}" '
                 '@click="$parent.$emit(\'remove_world\', props.row)"></q-btn>'
                 '</q-td>'
             )

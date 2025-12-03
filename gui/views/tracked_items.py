@@ -5,6 +5,7 @@ Tracked items view.
 from nicegui import ui
 from ..utils.formatters import format_time_ago
 from ..components.cards import warning_card
+from ..utils.icons import GameIcons
 
 
 def render(state, service, dark_mode: bool = False):
@@ -25,7 +26,7 @@ def render(state, service, dark_mode: bool = False):
         return
     
     for world, items in sorted(by_world.items()):
-        with ui.expansion(f'{world} ({len(items)} items)', icon='public').classes('w-full mb-2'):
+        with ui.expansion(f'{world} ({len(items)} items)', icon=GameIcons.WORLD).classes('w-full mb-2'):
             columns = [
                 {'name': 'item_id', 'label': 'Item ID', 'field': 'item_id', 'align': 'left'},
                 {'name': 'item_name', 'label': 'Name', 'field': 'item_name', 'align': 'left'},

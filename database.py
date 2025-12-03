@@ -840,17 +840,21 @@ class MarketDatabase:
             FROM current_prices cp
             LEFT JOIN items i ON cp.item_id = i.item_id
             WHERE cp.tracked_world_id = ?
-            AND strftime('%Y-%m-%d', cp.fetched_at) = strftime('%Y-%m-%d', 'now', 'localtime')
+            AND strftime('%Y-%m-%d', cp.fetched_at) = (
+                SELECT strftime('%Y-%m-%d', MAX(fetched_at)) 
+                FROM current_prices 
+                WHERE tracked_world_id = ?
+            )
             AND cp.hq_world_daily_velocity IS NOT NULL
             ORDER BY cp.hq_world_daily_velocity DESC
             LIMIT ?
             """,
-            (world_id, limit)
+            (world_id, world_id, limit)
         )
         return [dict(row) for row in cursor.fetchall()]
     
     def get_datacenter_gil_volume(self, world_id: int) -> Dict[str, Any]:
-        """Get total gil volume for a datacenter (sum of all items for today).
+        """Get total gil volume for a datacenter (sum of all items for most recent fetch).
         
         Args:
             world_id: World ID to query
@@ -867,9 +871,13 @@ class MarketDatabase:
                 COUNT(*) as item_count
             FROM current_prices
             WHERE tracked_world_id = ?
-            AND strftime('%Y-%m-%d', fetched_at) = strftime('%Y-%m-%d', 'now', 'localtime')
+            AND strftime('%Y-%m-%d', fetched_at) = (
+                SELECT strftime('%Y-%m-%d', MAX(fetched_at)) 
+                FROM current_prices 
+                WHERE tracked_world_id = ?
+            )
             """,
-            (world_id,)
+            (world_id, world_id)
         )
         row = cursor.fetchone()
         if row:

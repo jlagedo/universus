@@ -55,6 +55,11 @@ class UniversusGUI:
         try:
             self._ensure_api_connection()
             
+            # Load tracked worlds first
+            tracked_worlds = self.service.list_tracked_worlds()
+            tracked_world_ids = [w['world_id'] for w in tracked_worlds]
+            self.state.set_tracked_worlds(tracked_world_ids)
+            
             # Fetch worlds to build ID-to-name mapping
             worlds_data = await self.api.get_worlds_async()
             world_id_to_name = {w['id']: w['name'] for w in worlds_data}
@@ -65,16 +70,16 @@ class UniversusGUI:
             # Update application state
             self.state.set_datacenters(datacenters, world_id_to_name)
             
-            # Update header selectors
+            # Update header selectors with filtered lists
             if self.header:
                 self.header.update_datacenters(
-                    self.state.datacenter_names,
+                    self.state.get_filtered_datacenter_names(),
                     self.state.selected_datacenter
                 )
                 dc_worlds = self.state.get_worlds_for_datacenter()
                 self.header.update_worlds(dc_worlds, self.state.selected_world)
             
-            logger.info(f"Loaded {len(datacenters)} datacenters, {len(self.state.worlds)} worlds")
+            logger.info(f"Loaded {len(datacenters)} datacenters, {len(self.state.worlds)} worlds, {len(tracked_world_ids)} tracked")
         except Exception as e:
             logger.error(f"Failed to load datacenters: {e}")
             ui.notify(f"Failed to load datacenters: {e}", type='negative')
