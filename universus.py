@@ -24,9 +24,9 @@ config = get_config()
 
 @click.group()
 @click.version_option(version=__version__, prog_name="Universus")
-@click.option('--db-path', default=None, help='Path to database file')
-@click.option('--verbose', is_flag=True, help='Enable verbose logging')
-@click.option('--config-file', 'config_path', default=None, help='Path to config.toml file')
+@click.option('-d', '--db-path', default=None, help='Path to database file')
+@click.option('-v', '--verbose', is_flag=True, help='Enable verbose logging')
+@click.option('-c', '--config-file', 'config_path', default=None, help='Path to config.toml file')
 @click.pass_context
 def cli(ctx, db_path, verbose, config_path):
     """Universus - FFXIV Market Price CLI using Universalis API."""
@@ -80,11 +80,11 @@ def cleanup(ctx, result, **kwargs):
             logger.info("Cleanup complete")
 
 
-@cli.command()
+@cli.command(name='dc')
 @click.pass_context
 def datacenters(ctx):
     """List all available FFXIV datacenters."""
-    logger.info("Executing 'datacenters' command")
+    logger.info("Executing 'dc' command")
     service = ctx.obj['SERVICE']
     
     try:
@@ -98,8 +98,8 @@ def datacenters(ctx):
 
 
 @cli.command()
-@click.option('--world', required=True, help='World name')
-@click.option('--limit', default=None, type=int, help='Number of top items to show')
+@click.option('-w', '--world', required=True, help='World name')
+@click.option('-l', '--limit', default=None, type=int, help='Number of top items to show')
 @click.pass_context
 def top(ctx, world, limit):
     """Show top selling items by volume on a world."""
@@ -113,9 +113,9 @@ def top(ctx, world, limit):
 
 
 @cli.command()
-@click.option('--world', required=True, help='World name')
-@click.option('--item-id', required=True, type=int, help='Item ID to report on')
-@click.option('--days', default=None, type=int, help='Number of days to show')
+@click.option('-w', '--world', required=True, help='World name')
+@click.option('-i', '--item-id', required=True, type=int, help='Item ID to report on')
+@click.option('-n', '--days', default=None, type=int, help='Number of days to show')
 @click.pass_context
 def report(ctx, world, item_id, days):
     """Show detailed historical report for a specific item."""
@@ -139,7 +139,7 @@ def report(ctx, world, item_id, days):
         MarketUI.show_trends(trends)
 
 
-@cli.command(name='import-static-data')
+@cli.command(name='isd')
 @click.pass_context
 def import_static_data(ctx):
     """Import static data: item names and marketable items.
@@ -150,7 +150,7 @@ def import_static_data(ctx):
     
     Any existing data will be replaced.
     """
-    logger.info("Executing 'import-static-data' command")
+    logger.info("Executing 'isd' command")
     service = ctx.obj['SERVICE']
     
     try:
@@ -170,34 +170,30 @@ def import_static_data(ctx):
         MarketUI.exit_with_error(f"Failed to import static data: {str(e)}")
 
 
-# Alias for import-static-data
-cli.add_command(import_static_data, name='isd')
-
-
-@cli.group(name='tracked-worlds')
+@cli.group(name='tw')
 @click.pass_context
 def tracked_worlds_group(ctx):
     """Manage tracked worlds configuration (CRUD)."""
     pass
 
 
-@tracked_worlds_group.command('list')
+@tracked_worlds_group.command('ls')
 @click.pass_context
 def tracked_worlds_list(ctx):
     """List all tracked worlds."""
-    logger.info("Executing 'tracked-worlds list' command")
+    logger.info("Executing 'tw ls' command")
     service = ctx.obj['SERVICE']
     worlds = service.list_tracked_worlds()
     MarketUI.show_tracked_worlds(worlds)
 
 
-@tracked_worlds_group.command('add')
-@click.option('--world', required=False, help='World name (e.g., Behemoth)')
-@click.option('--world-id', required=False, type=int, help='World ID')
+@tracked_worlds_group.command('a')
+@click.option('-w', '--world', required=False, help='World name (e.g., Behemoth)')
+@click.option('-W', '--world-id', required=False, type=int, help='World ID')
 @click.pass_context
 def tracked_worlds_add(ctx, world, world_id):
     """Add a world to tracked worlds configuration."""
-    logger.info("Executing 'tracked-worlds add' command")
+    logger.info("Executing 'tw a' command")
     service = ctx.obj['SERVICE']
     try:
         with MarketUI.show_status("Resolving world..."):
@@ -208,13 +204,13 @@ def tracked_worlds_add(ctx, world, world_id):
         MarketUI.exit_with_error(str(e))
 
 
-@tracked_worlds_group.command('remove')
-@click.option('--world', required=False, help='World name (e.g., Behemoth)')
-@click.option('--world-id', required=False, type=int, help='World ID')
+@tracked_worlds_group.command('rm')
+@click.option('-w', '--world', required=False, help='World name (e.g., Behemoth)')
+@click.option('-W', '--world-id', required=False, type=int, help='World ID')
 @click.pass_context
 def tracked_worlds_remove(ctx, world, world_id):
     """Remove a world from tracked worlds configuration."""
-    logger.info("Executing 'tracked-worlds remove' command")
+    logger.info("Executing 'tw rm' command")
     service = ctx.obj['SERVICE']
     try:
         with MarketUI.show_status("Removing world..."):
@@ -228,11 +224,11 @@ def tracked_worlds_remove(ctx, world, world_id):
         MarketUI.exit_with_error(str(e))
 
 
-@tracked_worlds_group.command('clear')
+@tracked_worlds_group.command('clr')
 @click.pass_context
 def tracked_worlds_clear(ctx):
     """Clear all tracked worlds configuration."""
-    logger.info("Executing 'tracked-worlds clear' command")
+    logger.info("Executing 'tw clr' command")
     service = ctx.obj['SERVICE']
     try:
         with MarketUI.show_status("Clearing tracked worlds..."):
@@ -243,7 +239,7 @@ def tracked_worlds_clear(ctx):
         MarketUI.exit_with_error(str(e))
 
 
-@cli.command(name='refresh-cache')
+@cli.command(name='rc')
 @click.pass_context
 def refresh_cache(ctx):
     """Refresh cached datacenter and world data.
@@ -252,7 +248,7 @@ def refresh_cache(ctx):
     from the Universalis API. The cache is automatically used and refreshed
     daily, but this command allows manual refresh if needed.
     """
-    logger.info("Executing 'refresh-cache' command")
+    logger.info("Executing 'rc' command")
     service = ctx.obj['SERVICE']
     
     try:
@@ -273,7 +269,7 @@ def refresh_cache(ctx):
         MarketUI.exit_with_error(str(e))
 
 
-@cli.command(name='update-current-prices')
+@cli.command(name='ucp')
 @click.pass_context
 def update_current_prices(ctx):
     """Update current aggregated prices for all marketable items on tracked worlds.
@@ -284,7 +280,7 @@ def update_current_prices(ctx):
     - Stores results in `current_prices` table with timestamp and tracked world id
     - Skips items already updated today per world
     """
-    logger.info("Executing 'update-current-prices' command")
+    logger.info("Executing 'ucp' command")
     service = ctx.obj['SERVICE']
     try:
         with MarketUI.show_status("Updating aggregated prices (batched)..."):
