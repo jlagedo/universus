@@ -28,6 +28,12 @@ max_items_per_query = 200
 # Default number of history entries to fetch
 default_history_entries = 100
 
+# Batch size for aggregated price updates
+batch_size = 100
+
+# Number of worker threads for async operations
+executor_workers = 3
+
 [teamcraft]
 # FFXIV Teamcraft items data URL
 items_url = "https://raw.githubusercontent.com/ffxiv-teamcraft/ffxiv-teamcraft/master/libs/data/src/lib/json/items.json"

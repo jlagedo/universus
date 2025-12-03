@@ -6,16 +6,13 @@ import time
 import logging
 import re
 import asyncio
-from concurrent.futures import ThreadPoolExecutor
 from typing import Optional, Dict, Any, List
 import requests
 
 from config import get_config
+from executor import executor
 
 logger = logging.getLogger(__name__)
-
-# Thread pool executor for async operations
-_executor = ThreadPoolExecutor(max_workers=3)
 
 # Load configuration
 config = get_config()
@@ -188,7 +185,7 @@ class UniversalisAPI:
         """
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(
-            _executor,
+            executor,
             self._make_request,
             url,
             params,
@@ -352,7 +349,7 @@ class UniversalisAPI:
         """
         logger.info("Fetching items from FFXIV Teamcraft (async)")
         loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(_executor, self.fetch_teamcraft_items)
+        return await loop.run_in_executor(executor, self.fetch_teamcraft_items)
     
     def get_marketable_items(self) -> List[int]:
         """Fetch all marketable item IDs from the Universalis API.

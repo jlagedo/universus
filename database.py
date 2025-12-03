@@ -186,6 +186,8 @@ class MarketDatabase:
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_snapshots_date ON daily_snapshots(snapshot_date)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_sales_time ON sales_history(sale_time)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_tracked_world ON tracked_items(world)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_current_prices_fetched ON current_prices(fetched_at)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_current_prices_world ON current_prices(tracked_world_id)")
         
         self.conn.commit()
         logger.info("Database initialization complete")

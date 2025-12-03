@@ -4,7 +4,6 @@ Business logic layer for market data operations.
 
 import logging
 import asyncio
-from concurrent.futures import ThreadPoolExecutor
 from typing import List, Dict, Tuple
 from datetime import datetime
 
@@ -13,14 +12,12 @@ import requests
 from config import get_config
 from database import MarketDatabase
 from api_client import UniversalisAPI
+from executor import executor
 
 logger = logging.getLogger(__name__)
 
 # Load configuration
 config = get_config()
-
-# Thread pool executor for async operations
-_executor = ThreadPoolExecutor(max_workers=3)
 
 
 class MarketService:
@@ -101,7 +98,7 @@ class MarketService:
         """
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(
-            _executor,
+            executor,
             self.refresh_cache
         )
     
@@ -163,7 +160,7 @@ class MarketService:
         """
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(
-            _executor,
+            executor,
             self.initialize_tracking,
             world,
             limit
@@ -219,7 +216,7 @@ class MarketService:
         """
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(
-            _executor,
+            executor,
             self.update_tracked_items,
             world
         )
@@ -312,7 +309,7 @@ class MarketService:
         """
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(
-            _executor,
+            executor,
             self.sync_items_database
         )
     
@@ -340,7 +337,7 @@ class MarketService:
         """
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(
-            _executor,
+            executor,
             self.sync_marketable_items
         )
 
@@ -431,14 +428,15 @@ class MarketService:
                 except Exception:
                     world_name = str(world_id)
             updated_today = self.db.get_items_updated_today(world_id)
-            # Batch into groups of 100, skipping already updated ones
+            # Batch into groups, skipping already updated ones
+            batch_size = config.get('api', 'batch_size', 100)
             batch = []
             for iid in item_ids:
                 if iid in updated_today:
                     total_skipped += 1
                     continue
                 batch.append(iid)
-                if len(batch) == 100:
+                if len(batch) == batch_size:
                     data = self.api.get_aggregated_prices(world_name, batch)
                     results = data.get('results', [])
                     self.db.save_aggregated_prices(world_id, results)
