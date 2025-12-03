@@ -6,7 +6,6 @@ import sys
 from typing import List, Dict
 from rich.console import Console
 from rich.table import Table
-from rich.progress import Progress, SpinnerColumn, TextColumn
 
 console = Console()
 

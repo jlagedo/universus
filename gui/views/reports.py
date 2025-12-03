@@ -2,7 +2,6 @@
 Reports views (item report, sell volume, charts).
 """
 
-import asyncio
 from nicegui import ui
 from ..utils.formatters import format_gil, format_velocity
 from config import get_config

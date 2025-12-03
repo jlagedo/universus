@@ -2,7 +2,6 @@
 Main GUI application module.
 """
 
-import asyncio
 import logging
 from nicegui import ui
 
