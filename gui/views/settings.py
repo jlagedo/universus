@@ -4,7 +4,7 @@ Settings views (import static data, tracked worlds).
 
 import asyncio
 from nicegui import ui
-from ..components.cards import progress_card, warning_card, success_card
+from ..components.cards import warning_card, success_card
 from ..utils.icons import GameIcons
 
 
@@ -72,7 +72,7 @@ async def execute_import_static_data(service, progress_container, set_status):
                 success_card(f'Imported {items_count:,} item names and {marketable_count:,} marketable items')
             
             set_status('Ready')
-            ui.notify(f'Imported static data successfully', type='positive')
+            ui.notify('Imported static data successfully', type='positive')
             
         except Exception as e:
             progress_container.clear()

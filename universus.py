@@ -3,7 +3,6 @@
 Universus - A CLI for Final Fantasy XIV market prices using the Universalis API.
 """
 
-import sys
 import logging
 import click
 

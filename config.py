@@ -3,7 +3,6 @@ Configuration management for Universus.
 Loads settings from config.toml file.
 """
 
-import os
 import logging
 from pathlib import Path
 from typing import Any, Dict
