@@ -20,8 +20,11 @@ config = get_config()
 # Valid world name pattern (alphanumeric, allows spaces for multi-word names)
 WORLD_NAME_PATTERN = re.compile(r'^[A-Za-z][A-Za-z0-9\s-]{1,30}$')
 
-# API client version - should match universus.__version__
-API_VERSION = "1.0.0"
+# API client version - imported from main module to keep in sync
+try:
+    from universus import __version__ as API_VERSION
+except ImportError:
+    API_VERSION = "1.0.0"  # Fallback for tests/standalone use
 
 
 def validate_world_name(world: str) -> str:

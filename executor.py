@@ -5,6 +5,7 @@ This module provides a single ThreadPoolExecutor instance that is shared
 across the application to avoid creating multiple thread pools.
 """
 
+import atexit
 from concurrent.futures import ThreadPoolExecutor
 from config import get_config
 
@@ -34,3 +35,7 @@ def shutdown_executor(wait: bool = True):
         wait: If True, wait for pending tasks to complete
     """
     executor.shutdown(wait=wait)
+
+
+# Register automatic cleanup on application exit
+atexit.register(shutdown_executor, wait=False)

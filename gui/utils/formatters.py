@@ -28,7 +28,6 @@ def format_velocity(velocity: Optional[float]) -> str:
         return "N/A"
     # Use standard comma thousands separator with period for decimals
     return f"{v:,.2f}"
-    return s
 
 
 def format_time_ago(timestamp_str: str) -> str:
