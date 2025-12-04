@@ -24,15 +24,15 @@ class TestFormatFunctions:
     
     def test_format_gil_valid_amount(self):
         """Test formatting gil with valid amount."""
-        assert format_gil(1000) == "1.000"
-        assert format_gil(1000000) == "1.000.000"
+        assert format_gil(1000) == "1,000"
+        assert format_gil(1000000) == "1,000,000"
         assert format_gil(500) == "500"
         assert format_gil(0) == "0"
     
     def test_format_gil_float_amount(self):
         """Test formatting gil with float amount."""
-        assert format_gil(1234.56) == "1.235"
-        assert format_gil(999.99) == "1.000"
+        assert format_gil(1234.56) == "1,235"
+        assert format_gil(999.99) == "1,000"
     
     def test_format_gil_none(self):
         """Test formatting gil with None."""
@@ -472,11 +472,11 @@ class TestFormatGilEdgeCases:
     
     def test_format_gil_negative_amount(self):
         """Test formatting gil with negative amount."""
-        assert format_gil(-1000) == "-1.000"
+        assert format_gil(-1000) == "-1,000"
     
     def test_format_gil_large_amount(self):
         """Test formatting gil with very large amount."""
-        assert format_gil(999999999) == "999.999.999"
+        assert format_gil(999999999) == "999,999,999"
     
     def test_format_gil_invalid_string(self):
         """Test formatting gil with invalid string."""
@@ -498,8 +498,8 @@ class TestFormatVelocityEdgeCases:
     def test_format_velocity_large(self):
         """Test formatting large velocity."""
         result = format_velocity(1234567.89)
-        # Should contain proper thousands separators
-        assert "." in result and "," in result
+        # Should contain comma thousands separators and period for decimals
+        assert "," in result and "." in result
     
     def test_format_velocity_invalid_string(self):
         """Test formatting velocity with invalid string."""
@@ -508,7 +508,7 @@ class TestFormatVelocityEdgeCases:
     def test_format_velocity_zero(self):
         """Test formatting zero velocity."""
         result = format_velocity(0)
-        assert "0,00" in result
+        assert "0.00" in result
 
 
 class TestFormatTimeAgoEdgeCases:

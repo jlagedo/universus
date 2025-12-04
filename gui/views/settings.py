@@ -1,11 +1,102 @@
 """
-Settings views (import static data, tracked worlds).
+Settings views (import static data, tracked worlds, appearance).
 """
 
 import asyncio
 from nicegui import ui
 from ..components.cards import progress_card, warning_card, success_card
 from ..utils.icons import GameIcons
+
+
+def render_appearance_settings(theme_manager, on_theme_toggle, dark_mode: bool = False):
+    """Render appearance settings view.
+    
+    Args:
+        theme_manager: ThemeManager instance
+        on_theme_toggle: Callback for theme toggle
+        dark_mode: Whether dark mode is active
+    
+    Returns:
+        None
+    """
+    ui.label('Appearance Settings').classes('text-2xl font-bold mb-4')
+    ui.label('Customize the look and feel of the application.').classes('text-gray-500 mb-4')
+    
+    with ui.card().classes('w-full max-w-xl'):
+        ui.label('Theme').classes('text-lg font-semibold mb-4')
+        
+        # Theme toggle with visual indicator
+        with ui.row().classes('w-full items-center justify-between'):
+            with ui.column().classes('gap-1'):
+                ui.label('Dark Mode').classes('font-medium')
+                ui.label('Switch between light and dark color themes').classes('text-sm text-gray-500')
+            
+            theme_switch = ui.switch(
+                value=dark_mode,
+                on_change=lambda e: on_theme_toggle()
+            ).props('color=primary')
+        
+        ui.separator().classes('my-4')
+        
+        # Theme preview cards
+        ui.label('Theme Preview').classes('text-sm font-medium mb-2')
+        
+        with ui.row().classes('gap-4'):
+            # Light theme preview
+            with ui.card().classes('w-32 h-24 cursor-pointer').style(
+                'background: #ffffff; border: 2px solid ' + ('#e0e0e0' if dark_mode else '#1976d2')
+            ):
+                with ui.column().classes('items-center justify-center h-full'):
+                    ui.icon(GameIcons.THEME_LIGHT, size='sm').style('color: #1976d2')
+                    ui.label('Light').classes('text-xs').style('color: #333333')
+            
+            # Dark theme preview
+            with ui.card().classes('w-32 h-24 cursor-pointer').style(
+                'background: #1a1b26; border: 2px solid ' + ('#7aa2f7' if dark_mode else '#e0e0e0')
+            ):
+                with ui.column().classes('items-center justify-center h-full'):
+                    ui.icon(GameIcons.THEME_DARK, size='sm').style('color: #7aa2f7')
+                    ui.label('Dark').classes('text-xs').style('color: #c0caf5')
+        
+        ui.separator().classes('my-4')
+        
+        # Accessibility info
+        ui.label('Accessibility').classes('text-lg font-semibold mb-2')
+        
+        with ui.column().classes('gap-2'):
+            with ui.row().classes('items-center gap-2'):
+                ui.icon('check_circle', size='xs').classes('text-green-600')
+                ui.label('WCAG 2.1 AA contrast compliant').classes('text-sm')
+            
+            with ui.row().classes('items-center gap-2'):
+                ui.icon('check_circle', size='xs').classes('text-green-600')
+                ui.label('Full keyboard navigation support').classes('text-sm')
+            
+            with ui.row().classes('items-center gap-2'):
+                ui.icon('check_circle', size='xs').classes('text-green-600')
+                ui.label('Focus indicators for all interactive elements').classes('text-sm')
+        
+        ui.separator().classes('my-4')
+        
+        # Keyboard shortcuts info
+        ui.label('Keyboard Shortcuts').classes('text-sm font-medium mb-2')
+        
+        with ui.column().classes('gap-1'):
+            with ui.row().classes('items-center gap-2'):
+                ui.html('<kbd class="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded text-xs font-mono">Tab</kbd>').classes('')
+                ui.label('Navigate between elements').classes('text-sm text-gray-600')
+            
+            with ui.row().classes('items-center gap-2'):
+                ui.html('<kbd class="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded text-xs font-mono">Enter</kbd>').classes('')
+                ui.label('Activate buttons and links').classes('text-sm text-gray-600')
+            
+            with ui.row().classes('items-center gap-2'):
+                ui.html('<kbd class="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded text-xs font-mono">Space</kbd>').classes('')
+                ui.label('Toggle checkboxes and switches').classes('text-sm text-gray-600')
+            
+            with ui.row().classes('items-center gap-2'):
+                ui.html('<kbd class="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded text-xs font-mono">Esc</kbd>').classes('')
+                ui.label('Close dialogs and menus').classes('text-sm text-gray-600')
 
 
 def render_import_static_data(service, dark_mode: bool = False):

@@ -7,29 +7,27 @@ from typing import Optional
 
 
 def format_gil(amount: Optional[float]) -> str:
-    """Format gil amount using locale-style separators (e.g. 1.234.567)."""
+    """Format gil amount with thousands separators (e.g. 1,234,567)."""
     if amount is None:
         return "N/A"
     try:
         amt = int(round(float(amount)))
     except (TypeError, ValueError):
         return "N/A"
-    # Use US formatting then swap to PT-BR style: thousands '.'
-    s = f"{amt:,}"  # e.g. 1,234,567
-    return s.replace(',', '.')
+    # Use standard comma thousands separator
+    return f"{amt:,}"
 
 
 def format_velocity(velocity: Optional[float]) -> str:
-    """Format sales velocity with decimal comma (e.g. 12,34)."""
+    """Format sales velocity with 2 decimal places (e.g. 12.34)."""
     if velocity is None:
         return "N/A"
     try:
         v = float(velocity)
     except (TypeError, ValueError):
         return "N/A"
-    s = f"{v:,.2f}"  # e.g. 1,234.56
-    # Swap separators: temporary marker for commas
-    s = s.replace(',', 'X').replace('.', ',').replace('X', '.')
+    # Use standard comma thousands separator with period for decimals
+    return f"{v:,.2f}"
     return s
 
 

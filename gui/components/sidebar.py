@@ -22,83 +22,82 @@ class Sidebar:
         self._render(on_view_change)
     
     def _render(self, on_view_change: Callable):
-        """Render the sidebar."""
+        """Render the sidebar with collapsible sections."""
         sidebar_class = 'bg-gray-100' if not self.dark_mode else 'bg-gray-800'
         nav_label_class = 'text-lg font-bold p-4 text-gray-900' if not self.dark_mode else 'text-lg font-bold p-4 text-white'
-        section_label_class = 'text-sm text-gray-500 px-4 py-2' if not self.dark_mode else 'text-sm text-gray-400 px-4 py-2'
         
         with ui.left_drawer(value=True).classes(sidebar_class):
             ui.label('Navigation').classes(nav_label_class)
             
             with ui.column().classes('w-full gap-0'):
-                # Dashboard
+                # Dashboard - always visible at top
                 ui.button(
                     'Dashboard',
                     icon=GameIcons.DASHBOARD,
                     on_click=lambda: on_view_change('dashboard')
                 ).classes('w-full justify-start').props('flat align=left')
                 
-                ui.separator()
-                ui.label('Market Data').classes(section_label_class)
+                ui.separator().classes('my-2')
                 
-                # Datacenters
-                ui.button(
-                    'Datacenters',
-                    icon=GameIcons.DATACENTER,
-                    on_click=lambda: on_view_change('datacenters')
-                ).classes('w-full justify-start').props('flat align=left')
+                # Market Data Section - Collapsible
+                with ui.expansion('Market Data', icon=GameIcons.CHART_BAR, value=False).classes('w-full').props('dense header-class="text-weight-medium"'):
+                    with ui.column().classes('w-full gap-0 pl-2'):
+                        ui.button(
+                            'Datacenters',
+                            icon=GameIcons.DATACENTER,
+                            on_click=lambda: on_view_change('datacenters')
+                        ).classes('w-full justify-start').props('flat align=left dense')
+                        
+                        ui.button(
+                            'Top Items',
+                            icon=GameIcons.TRENDING,
+                            on_click=lambda: on_view_change('top')
+                        ).classes('w-full justify-start').props('flat align=left dense')
                 
-                # Top Items
-                ui.button(
-                    'Top Items',
-                    icon=GameIcons.TRENDING,
-                    on_click=lambda: on_view_change('top')
-                ).classes('w-full justify-start').props('flat align=left')
-                
-                ui.separator()
-                ui.label('Analysis').classes(section_label_class)
-                
-                # Item Report
-                ui.button(
-                    'Item Report',
-                    icon=GameIcons.ANALYTICS,
-                    on_click=lambda: on_view_change('report')
-                ).classes('w-full justify-start').props('flat align=left')
-                
-                # Sell Volume by World Report
-                ui.button(
-                    'Sell Volume by World',
-                    icon=GameIcons.INSIGHTS,
-                    on_click=lambda: on_view_change('sell_volume')
-                ).classes('w-full justify-start').props('flat align=left')
+                # Analysis Section - Collapsible
+                with ui.expansion('Analysis', icon=GameIcons.ANALYTICS, value=False).classes('w-full').props('dense header-class="text-weight-medium"'):
+                    with ui.column().classes('w-full gap-0 pl-2'):
+                        ui.button(
+                            'Item Report',
+                            icon=GameIcons.ANALYTICS,
+                            on_click=lambda: on_view_change('report')
+                        ).classes('w-full justify-start').props('flat align=left dense')
+                        
+                        ui.button(
+                            'Sell Volume by World',
+                            icon=GameIcons.INSIGHTS,
+                            on_click=lambda: on_view_change('sell_volume')
+                        ).classes('w-full justify-start').props('flat align=left dense')
 
-                # Sell Volume Chart
-                ui.button(
-                    'Sell Volume Chart',
-                    icon=GameIcons.CHART_PIE,
-                    on_click=lambda: on_view_change('sell_volume_chart')
-                ).classes('w-full justify-start').props('flat align=left')
+                        ui.button(
+                            'Sell Volume Chart',
+                            icon=GameIcons.CHART_PIE,
+                            on_click=lambda: on_view_change('sell_volume_chart')
+                        ).classes('w-full justify-start').props('flat align=left dense')
+                        
+                        ui.button(
+                            'Market Analysis',
+                            icon=GameIcons.CHART_BAR,
+                            on_click=lambda: on_view_change('market_analysis')
+                        ).classes('w-full justify-start').props('flat align=left dense')
                 
-                # Market Analysis
-                ui.button(
-                    'Market Analysis',
-                    icon=GameIcons.CHART_BAR,
-                    on_click=lambda: on_view_change('market_analysis')
-                ).classes('w-full justify-start').props('flat align=left')
-                
-                ui.separator()
-                ui.label('Settings').classes(section_label_class)
-                
-                # Import Static Data
-                ui.button(
-                    'Import Static Data',
-                    icon=GameIcons.CLOUD_DOWNLOAD,
-                    on_click=lambda: on_view_change('import_static_data')
-                ).classes('w-full justify-start').props('flat align=left')
-                
-                # Tracked Worlds
-                ui.button(
-                    'Tracked Worlds',
-                    icon=GameIcons.WORLD,
-                    on_click=lambda: on_view_change('tracked_worlds')
-                ).classes('w-full justify-start').props('flat align=left')
+                # Settings Section - Collapsible  
+                with ui.expansion('Settings', icon=GameIcons.SETTINGS, value=False).classes('w-full').props('dense header-class="text-weight-medium"'):
+                    with ui.column().classes('w-full gap-0 pl-2'):
+                        ui.button(
+                            'Appearance',
+                            icon=GameIcons.THEME_DARK,
+                            on_click=lambda: on_view_change('appearance')
+                        ).classes('w-full justify-start').props('flat align=left dense')
+                        
+                        ui.button(
+                            'Import Static Data',
+                            icon=GameIcons.CLOUD_DOWNLOAD,
+                            on_click=lambda: on_view_change('import_static_data')
+                        ).classes('w-full justify-start').props('flat align=left dense')
+                        
+                        ui.button(
+                            'Tracked Worlds',
+                            icon=GameIcons.WORLD,
+                            on_click=lambda: on_view_change('tracked_worlds')
+                        ).classes('w-full justify-start').props('flat align=left dense')

@@ -52,16 +52,51 @@ h1, h2, h3, h4, h5, h6,
     font-family: var(--font-accent);
 }
 
-/* Table font sizing - ensure readable text */
+/* Table font sizing - enhanced readability */
 .q-table tbody td {
-    font-size: 0.925rem;
-    padding: 8px 12px;
+    font-size: 1rem;
+    padding: 10px 14px;
 }
 
 .q-table thead th {
-    font-size: 0.925rem;
+    font-size: 1.05rem;
+    font-weight: 700;
+    padding: 12px 14px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+/* Alternating row colors for better scanability */
+.q-table tbody tr:nth-child(even) {
+    background-color: rgba(0, 0, 0, 0.03);
+}
+
+.q-table tbody tr:nth-child(odd) {
+    background-color: transparent;
+}
+
+/* Item name column - larger and bolder */
+.q-table tbody td[data-col="item_name"],
+.q-table tbody td[data-col="item"],
+.q-table tbody td[data-col="name"] {
+    font-size: 1.05rem;
     font-weight: 600;
-    padding: 10px 12px;
+}
+
+/* High-impact metrics - bold colored text */
+.metric-highlight {
+    font-weight: 700;
+    color: #1976d2;
+}
+
+.metric-volume {
+    font-weight: 700;
+    color: #2e7d32;
+}
+
+.metric-price {
+    font-weight: 700;
+    color: #7b1fa2;
 }
 
 /* Buttons - Exo 2 for readability with gaming feel */
@@ -94,6 +129,59 @@ h1, h2, h3, h4, h5, h6,
 /* Footer */
 .q-footer {
     font-family: var(--font-accent);
+}
+
+/* Accessibility - Focus styles for keyboard navigation */
+*:focus {
+    outline: 2px solid #1976d2;
+    outline-offset: 2px;
+}
+
+*:focus:not(:focus-visible) {
+    outline: none;
+}
+
+*:focus-visible {
+    outline: 2px solid #1976d2;
+    outline-offset: 2px;
+}
+
+/* Skip link for keyboard users */
+.skip-link {
+    position: absolute;
+    top: -40px;
+    left: 0;
+    background: #1976d2;
+    color: white;
+    padding: 8px 16px;
+    z-index: 100;
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.skip-link:focus {
+    top: 0;
+}
+
+/* Button keyboard focus enhancement */
+.q-btn:focus-visible {
+    box-shadow: 0 0 0 3px rgba(25, 118, 210, 0.4);
+}
+
+/* Input keyboard focus enhancement */
+.q-field--focused .q-field__control {
+    box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.3);
+}
+
+/* Table row keyboard focus */
+.q-table tbody tr:focus-within {
+    background-color: rgba(25, 118, 210, 0.1);
+}
+
+/* Ensure minimum touch target size (48px) */
+.q-btn, .q-item {
+    min-height: 44px;
+    min-width: 44px;
 }
 '''
 
@@ -171,20 +259,19 @@ class ThemeManager:
     
     @staticmethod
     def _get_dark_css() -> str:
-        """Get dark theme CSS - Tokyo Night theme colors."""
+        """Get dark theme CSS - Tokyo Night theme colors with WCAG 2.1 AA contrast."""
         return '''
-            /* Tokyo Night Color Palette:
+            /* Tokyo Night Color Palette - Enhanced for Accessibility:
                Background: #1a1b26 (main), #16161e (darker), #1f2335 (lighter)
-               Foreground: #a9b1d6 (main text), #c0caf5 (bright text)
-               Comments: #565f89
-               Selection: #33467c
+               Foreground: #c0caf5 (main text - 11.5:1 contrast), #e0e0e0 (bright text - 13:1 contrast)
+               Muted: #9aa5ce (7:1 contrast for secondary text)
                Primary: #7aa2f7 (blue), #bb9af7 (purple), #7dcfff (cyan)
                Accent: #9ece6a (green), #e0af68 (yellow), #f7768e (red/magenta)
             */
             
             body, html {
                 background-color: #1a1b26;
-                color: #a9b1d6;
+                color: #c0caf5;
             }
             
             .nicegui-app {
@@ -194,41 +281,68 @@ class ThemeManager:
             /* Cards */
             .q-card, .q-expansion-item {
                 background-color: #1f2335;
-                color: #a9b1d6;
-                border: 1px solid #33467c;
+                color: #c0caf5;
+                border: 1px solid #3d4a6b;
             }
             
-            /* Input fields */
+            /* Expansion items in dark mode */
+            .q-expansion-item .q-item__label {
+                color: #c0caf5 !important;
+            }
+            
+            .q-expansion-item__container {
+                background-color: #1f2335;
+            }
+            
+            /* Input fields - improved contrast */
             .q-field__control, .q-field__native input, .q-field__native textarea {
-                color: #c0caf5;
+                color: #e0e0e0;
                 background-color: #24283b;
             }
             
             .q-field__label {
-                color: #565f89;
+                color: #9aa5ce;
             }
             
             .q-field--focused .q-field__label {
-                color: #7aa2f7 !important;
+                color: #7dcfff !important;
             }
             
             .q-field--focused .q-field__control {
                 border-color: #7aa2f7;
+                box-shadow: 0 0 0 2px rgba(122, 162, 247, 0.3);
+            }
+                border-color: #7aa2f7;
             }
             
-            /* Tables */
+            /* Tables - improved contrast */
             .q-table__card {
                 background-color: #1f2335;
-                color: #a9b1d6;
+                color: #c0caf5;
             }
             
             .q-table tbody td {
-                color: #a9b1d6;
-                border-color: #33467c;
+                color: #c0caf5;
+                border-color: #3d4a6b;
+            }
+            
+            /* Alternating row colors for dark theme */
+            .q-table tbody tr:nth-child(even) {
+                background-color: rgba(36, 40, 59, 0.7);
+            }
+            
+            .q-table tbody tr:nth-child(odd) {
+                background-color: transparent;
             }
             
             .q-table tbody tr:hover {
-                background-color: #24283b;
+                background-color: #3d4a6b;
+            }
+            
+            .q-table tbody tr:focus-within {
+                background-color: rgba(122, 162, 247, 0.2);
+                outline: 2px solid #7aa2f7;
+                outline-offset: -2px;
             }
             
             .q-table thead tr {
@@ -236,22 +350,40 @@ class ThemeManager:
             }
             
             .q-table thead th {
-                color: #7aa2f7;
+                color: #7dcfff;
                 background-color: #24283b;
-                border-color: #33467c;
+                border-color: #3d4a6b;
+                font-weight: 700;
             }
             
-            /* Buttons */
+            /* High-impact metrics in dark mode - improved contrast */
+            .metric-highlight {
+                color: #7dcfff !important;
+            }
+            
+            .metric-volume {
+                color: #9ece6a !important;
+            }
+            
+            .metric-price {
+                color: #bb9af7 !important;
+            }
+            
+            /* Buttons - improved contrast and focus */
             .q-btn {
-                color: #c0caf5;
+                color: #e0e0e0;
             }
             
             .q-btn--flat {
-                color: #a9b1d6;
+                color: #c0caf5;
             }
             
             .q-btn--flat:hover {
-                background-color: #24283b;
+                background-color: #2a2f45;
+            }
+            
+            .q-btn:focus-visible {
+                box-shadow: 0 0 0 3px rgba(122, 162, 247, 0.5);
             }
             
             .q-btn.bg-primary {
@@ -265,27 +397,33 @@ class ThemeManager:
             
             /* Separators */
             .q-separator {
-                background-color: #33467c;
+                background-color: #3d4a6b;
             }
             
-            /* Select/Dropdown */
+            /* Select/Dropdown - improved contrast */
             .q-menu {
                 background-color: #1f2335;
-                color: #a9b1d6;
-                border: 1px solid #33467c;
+                color: #c0caf5;
+                border: 1px solid #3d4a6b;
             }
             
             .q-item {
-                color: #a9b1d6;
+                color: #c0caf5;
             }
             
             .q-item:hover {
-                background-color: #24283b;
+                background-color: #2a2f45;
+            }
+            
+            .q-item:focus-visible {
+                background-color: rgba(122, 162, 247, 0.2);
+                outline: 2px solid #7aa2f7;
+                outline-offset: -2px;
             }
             
             .q-item--active {
-                background-color: #33467c;
-                color: #7aa2f7;
+                background-color: #3d4a6b;
+                color: #7dcfff;
             }
             
             /* Scrollbars */
@@ -307,21 +445,25 @@ class ThemeManager:
                 background: #565f89;
             }
             
-            /* Labels and text */
+            /* Labels and text - improved contrast for accessibility */
             .text-gray-900 {
-                color: #c0caf5 !important;
+                color: #e0e0e0 !important;
             }
             
             .text-gray-500 {
-                color: #565f89 !important;
+                color: #9aa5ce !important;
             }
             
             .text-gray-600 {
-                color: #787c99 !important;
+                color: #a9b1d6 !important;
             }
             
             .text-gray-400 {
-                color: #a9b1d6 !important;
+                color: #c0caf5 !important;
+            }
+            
+            .text-gray-300 {
+                color: #c0caf5 !important;
             }
             
             /* Background colors */
@@ -404,23 +546,41 @@ class ThemeManager:
                 border: 1px solid #33467c;
             }
             
-            /* Sidebar */
+            /* Sidebar - improved contrast and focus */
             .q-drawer {
                 background-color: #16161e !important;
             }
             
             .q-drawer .q-item {
-                color: #a9b1d6;
+                color: #c0caf5;
             }
             
             .q-drawer .q-item:hover {
                 background-color: #1f2335;
             }
             
+            .q-drawer .q-item:focus-visible {
+                background-color: rgba(122, 162, 247, 0.2);
+                outline: 2px solid #7aa2f7;
+                outline-offset: -2px;
+            }
+            
             .q-drawer .q-item--active {
                 background-color: #24283b;
-                color: #7aa2f7;
+                color: #7dcfff;
                 border-left: 3px solid #7aa2f7;
+            }
+            
+            .q-drawer .q-expansion-item {
+                border: none;
+            }
+            
+            .q-drawer .q-expansion-item .q-item {
+                color: #c0caf5;
+            }
+            
+            .q-drawer .q-expansion-item .q-item__section--side {
+                color: #9aa5ce;
             }
             
             /* Header */

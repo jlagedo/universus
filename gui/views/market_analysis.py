@@ -33,7 +33,8 @@ def render(state, service, dark_mode: bool = False):
         world_name = w.get('world_name') or state.world_id_to_name.get(world_id, f"World {world_id}")
         world_options[world_name] = world_id
     
-    with ui.card().classes('w-full max-w-2xl'):
+    # Sticky filter card that stays visible when scrolling
+    with ui.card().classes('w-full max-w-2xl sticky top-0 z-10').style('position: sticky; top: 0;'):
         ui.label('Filters').classes('text-lg font-semibold mb-2')
         
         with ui.row().classes('w-full gap-4 items-end'):
@@ -90,16 +91,16 @@ def generate_analysis(state, service, world_options, world_name, search_term, co
             search_info = f' • Filtered by "{search_term}"' if search_term and search_term.strip() else ''
             ui.label(f'{world_name} Market Analysis • Data from {latest_date}{search_info}').classes('text-lg font-semibold mb-2')
             
-            # Define columns for the table
+            # Define columns for the table with tooltips
             columns = [
                 {'name': 'rank', 'label': '#', 'field': 'rank', 'sortable': True, 'align': 'center'},
                 {'name': 'item_name', 'label': 'Item Name', 'field': 'item_name', 'sortable': True, 'align': 'left'},
-                {'name': 'total_volume', 'label': 'Total Volume', 'field': 'total_volume', 'sortable': True, 'align': 'right'},
-                {'name': 'total_velocity', 'label': 'Total Vel/Day', 'field': 'total_velocity', 'sortable': True, 'align': 'right'},
-                {'name': 'hq_velocity', 'label': 'HQ Vel/Day', 'field': 'hq_velocity', 'sortable': True, 'align': 'right'},
-                {'name': 'hq_min_price', 'label': 'HQ Min Price', 'field': 'hq_min_price', 'sortable': True, 'align': 'right'},
-                {'name': 'nq_velocity', 'label': 'NQ Vel/Day', 'field': 'nq_velocity', 'sortable': True, 'align': 'right'},
-                {'name': 'nq_min_price', 'label': 'NQ Min Price', 'field': 'nq_min_price', 'sortable': True, 'align': 'right'},
+                {'name': 'total_volume', 'label': 'Total Volume', 'field': 'total_volume', 'sortable': True, 'align': 'right', 'headerClasses': 'tooltip-header', 'headerStyle': 'cursor: help;'},
+                {'name': 'total_velocity', 'label': 'Total Vel/Day', 'field': 'total_velocity', 'sortable': True, 'align': 'right', 'headerClasses': 'tooltip-header', 'headerStyle': 'cursor: help;'},
+                {'name': 'hq_velocity', 'label': 'HQ Vel/Day', 'field': 'hq_velocity', 'sortable': True, 'align': 'right', 'headerClasses': 'tooltip-header', 'headerStyle': 'cursor: help;'},
+                {'name': 'hq_min_price', 'label': 'HQ Min Price', 'field': 'hq_min_price', 'sortable': True, 'align': 'right', 'headerClasses': 'tooltip-header', 'headerStyle': 'cursor: help;'},
+                {'name': 'nq_velocity', 'label': 'NQ Vel/Day', 'field': 'nq_velocity', 'sortable': True, 'align': 'right', 'headerClasses': 'tooltip-header', 'headerStyle': 'cursor: help;'},
+                {'name': 'nq_min_price', 'label': 'NQ Min Price', 'field': 'nq_min_price', 'sortable': True, 'align': 'right', 'headerClasses': 'tooltip-header', 'headerStyle': 'cursor: help;'},
             ]
             
             rows = []
@@ -132,24 +133,90 @@ def generate_analysis(state, service, world_options, world_name, search_term, co
                 pagination={'rowsPerPage': 100, 'sortBy': 'rank', 'descending': False}
             ).classes('w-full').props('flat bordered wrap-cells virtual-scroll')
             
-            # Add slot templates to display formatted values
+            # Add header slot with tooltips
+            table.add_slot('header-cell-total_volume', '''
+                <q-th :props="props">
+                    <span>Total Volume</span>
+                    <q-tooltip class="bg-grey-8 text-body2">Daily velocity × minimum price (estimated daily gil traded)</q-tooltip>
+                </q-th>
+            ''')
+            table.add_slot('header-cell-total_velocity', '''
+                <q-th :props="props">
+                    <span>Total Vel/Day</span>
+                    <q-tooltip class="bg-grey-8 text-body2">Velocity/Day: Average number of items sold per day (HQ + NQ combined)</q-tooltip>
+                </q-th>
+            ''')
+            table.add_slot('header-cell-hq_velocity', '''
+                <q-th :props="props">
+                    <span>HQ Vel/Day</span>
+                    <q-tooltip class="bg-grey-8 text-body2">HQ Velocity/Day: High Quality items sold per day</q-tooltip>
+                </q-th>
+            ''')
+            table.add_slot('header-cell-hq_min_price', '''
+                <q-th :props="props">
+                    <span>HQ Min Price</span>
+                    <q-tooltip class="bg-grey-8 text-body2">HQ Min Price: Lowest current listing price for High Quality items</q-tooltip>
+                </q-th>
+            ''')
+            table.add_slot('header-cell-nq_velocity', '''
+                <q-th :props="props">
+                    <span>NQ Vel/Day</span>
+                    <q-tooltip class="bg-grey-8 text-body2">NQ Velocity/Day: Normal Quality items sold per day</q-tooltip>
+                </q-th>
+            ''')
+            table.add_slot('header-cell-nq_min_price', '''
+                <q-th :props="props">
+                    <span>NQ Min Price</span>
+                    <q-tooltip class="bg-grey-8 text-body2">NQ Min Price: Lowest current listing price for Normal Quality items</q-tooltip>
+                </q-th>
+            ''')
+            
+            # Add slot templates to display formatted values with highlighting and zero-value warnings
+            table.add_slot('body-cell-item_name', '''
+                <q-td :props="props" class="text-weight-bold" style="font-size: 1.05rem;">{{ props.row.item_name }}</q-td>
+            ''')
             table.add_slot('body-cell-total_volume', '''
-                <q-td :props="props">{{ props.row.total_volume_fmt }}</q-td>
+                <q-td :props="props" class="metric-volume text-weight-bold">{{ props.row.total_volume_fmt }}</q-td>
             ''')
             table.add_slot('body-cell-total_velocity', '''
-                <q-td :props="props">{{ props.row.total_velocity_fmt }}</q-td>
+                <q-td :props="props" :class="props.row.total_velocity == 0 ? 'text-grey-5' : ''">
+                    <q-icon v-if="props.row.total_velocity == 0" name="warning" class="text-amber-6 q-mr-xs" size="xs">
+                        <q-tooltip>No sales recorded</q-tooltip>
+                    </q-icon>
+                    {{ props.row.total_velocity_fmt }}
+                </q-td>
             ''')
             table.add_slot('body-cell-hq_velocity', '''
-                <q-td :props="props">{{ props.row.hq_velocity_fmt }}</q-td>
+                <q-td :props="props" :class="props.row.hq_velocity == 0 ? 'text-grey-5' : ''">
+                    <q-icon v-if="props.row.hq_velocity == 0" name="warning" class="text-amber-6 q-mr-xs" size="xs">
+                        <q-tooltip>No HQ sales recorded</q-tooltip>
+                    </q-icon>
+                    {{ props.row.hq_velocity_fmt }}
+                </q-td>
             ''')
             table.add_slot('body-cell-hq_min_price', '''
-                <q-td :props="props">{{ props.row.hq_min_price_fmt }}</q-td>
+                <q-td :props="props" :class="props.row.hq_min_price == 0 ? 'text-grey-5' : 'metric-price text-weight-bold'">
+                    <q-icon v-if="props.row.hq_min_price == 0" name="remove_shopping_cart" class="text-grey-5 q-mr-xs" size="xs">
+                        <q-tooltip>No HQ listings available</q-tooltip>
+                    </q-icon>
+                    {{ props.row.hq_min_price_fmt }}
+                </q-td>
             ''')
             table.add_slot('body-cell-nq_velocity', '''
-                <q-td :props="props">{{ props.row.nq_velocity_fmt }}</q-td>
+                <q-td :props="props" :class="props.row.nq_velocity == 0 ? 'text-grey-5' : ''">
+                    <q-icon v-if="props.row.nq_velocity == 0" name="warning" class="text-amber-6 q-mr-xs" size="xs">
+                        <q-tooltip>No NQ sales recorded</q-tooltip>
+                    </q-icon>
+                    {{ props.row.nq_velocity_fmt }}
+                </q-td>
             ''')
             table.add_slot('body-cell-nq_min_price', '''
-                <q-td :props="props">{{ props.row.nq_min_price_fmt }}</q-td>
+                <q-td :props="props" :class="props.row.nq_min_price == 0 ? 'text-grey-5' : 'metric-price text-weight-bold'">
+                    <q-icon v-if="props.row.nq_min_price == 0" name="remove_shopping_cart" class="text-grey-5 q-mr-xs" size="xs">
+                        <q-tooltip>No NQ listings available</q-tooltip>
+                    </q-icon>
+                    {{ props.row.nq_min_price_fmt }}
+                </q-td>
             ''')
             
             ui.label(f'Showing {len(results)} items').classes('text-sm text-gray-500 mt-2')

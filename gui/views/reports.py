@@ -106,7 +106,15 @@ def generate_item_report(state, service, item_id, days, container, set_status):
                 for s in reversed(snapshots)
             ]
             
-            ui.table(columns=columns, rows=rows, row_key='date', pagination={'rowsPerPage': 15}).classes('w-full')
+            report_table = ui.table(columns=columns, rows=rows, row_key='date', pagination={'rowsPerPage': 15}).classes('w-full')
+            
+            # Add slot templates for styled columns
+            report_table.add_slot('body-cell-velocity', '''
+                <q-td :props="props" class="metric-highlight text-weight-bold">{{ props.row.velocity }}</q-td>
+            ''')
+            report_table.add_slot('body-cell-min_price', '''
+                <q-td :props="props" class="metric-price text-weight-bold">{{ props.row.min_price }}</q-td>
+            ''')
         
         set_status('Ready')
         
@@ -144,7 +152,8 @@ def render_sell_volume(state, service, dark_mode: bool = False):
         world_name = w.get('world_name') or state.world_id_to_name.get(world_id, f"World {world_id}")
         world_options[world_name] = world_id
     
-    with ui.card().classes('w-full max-w-xl'):
+    # Sticky filter card
+    with ui.card().classes('w-full max-w-xl sticky top-0 z-10').style('position: sticky; top: 0;'):
         ui.label('Filter').classes('text-lg font-semibold mb-2')
         
         selected_world_name = list(world_options.keys())[0] if world_options else None
@@ -193,11 +202,11 @@ def generate_sell_volume_report(state, service, world_options, world_name, limit
             columns = [
                 {'name': 'rank', 'label': 'Rank', 'field': 'rank', 'align': 'center'},
                 {'name': 'item_name', 'label': 'Item Name', 'field': 'item_name', 'align': 'left'},
-                {'name': 'hq_velocity', 'label': 'HQ Daily Velocity', 'field': 'hq_velocity', 'align': 'right'},
-                {'name': 'hq_recent_price', 'label': 'HQ Recent Price', 'field': 'hq_recent_price', 'align': 'right'},
-                {'name': 'hq_avg_price', 'label': 'HQ Avg Price', 'field': 'hq_avg_price', 'align': 'right'},
-                {'name': 'hq_min_price', 'label': 'HQ Min Price', 'field': 'hq_min_price', 'align': 'right'},
-                {'name': 'gil_volume', 'label': 'Gil Volume', 'field': 'gil_volume', 'align': 'right'},
+                {'name': 'hq_velocity', 'label': 'HQ Daily Velocity', 'field': 'hq_velocity', 'align': 'right', 'headerClasses': 'tooltip-header', 'headerStyle': 'cursor: help;'},
+                {'name': 'hq_recent_price', 'label': 'HQ Recent Price', 'field': 'hq_recent_price', 'align': 'right', 'headerClasses': 'tooltip-header', 'headerStyle': 'cursor: help;'},
+                {'name': 'hq_avg_price', 'label': 'HQ Avg Price', 'field': 'hq_avg_price', 'align': 'right', 'headerClasses': 'tooltip-header', 'headerStyle': 'cursor: help;'},
+                {'name': 'hq_min_price', 'label': 'HQ Min Price', 'field': 'hq_min_price', 'align': 'right', 'headerClasses': 'tooltip-header', 'headerStyle': 'cursor: help;'},
+                {'name': 'gil_volume', 'label': 'Gil Volume', 'field': 'gil_volume', 'align': 'right', 'headerClasses': 'tooltip-header', 'headerStyle': 'cursor: help;'},
             ]
             
             rows = []
@@ -205,14 +214,73 @@ def generate_sell_volume_report(state, service, world_options, world_name, limit
                 rows.append({
                     'rank': idx,
                     'item_name': item['item_name'],
-                    'hq_velocity': format_velocity(item['hq_velocity']),
+                    'hq_velocity': item['hq_velocity'],
+                    'hq_velocity_fmt': format_velocity(item['hq_velocity']),
                     'hq_recent_price': format_gil(item['hq_recent_price']),
                     'hq_avg_price': format_gil(item['hq_avg_price']),
-                    'hq_min_price': format_gil(item['hq_min_price']),
+                    'hq_min_price': item['hq_min_price'],
+                    'hq_min_price_fmt': format_gil(item['hq_min_price']),
                     'gil_volume': format_gil(item['gil_volume']),
                 })
             
-            ui.table(columns=columns, rows=rows, row_key='rank', pagination={'rowsPerPage': 20}).classes('w-full')
+            table = ui.table(columns=columns, rows=rows, row_key='rank', pagination={'rowsPerPage': 20}).classes('w-full')
+            
+            # Add header tooltips
+            table.add_slot('header-cell-hq_velocity', '''
+                <q-th :props="props">
+                    <span>HQ Daily Velocity</span>
+                    <q-tooltip class="bg-grey-8 text-body2">HQ Velocity: Average High Quality items sold per day</q-tooltip>
+                </q-th>
+            ''')
+            table.add_slot('header-cell-hq_recent_price', '''
+                <q-th :props="props">
+                    <span>HQ Recent Price</span>
+                    <q-tooltip class="bg-grey-8 text-body2">Most recent sale price for HQ items</q-tooltip>
+                </q-th>
+            ''')
+            table.add_slot('header-cell-hq_avg_price', '''
+                <q-th :props="props">
+                    <span>HQ Avg Price</span>
+                    <q-tooltip class="bg-grey-8 text-body2">Average sale price for HQ items</q-tooltip>
+                </q-th>
+            ''')
+            table.add_slot('header-cell-hq_min_price', '''
+                <q-th :props="props">
+                    <span>HQ Min Price</span>
+                    <q-tooltip class="bg-grey-8 text-body2">Lowest current listing price for HQ items</q-tooltip>
+                </q-th>
+            ''')
+            table.add_slot('header-cell-gil_volume', '''
+                <q-th :props="props">
+                    <span>Gil Volume</span>
+                    <q-tooltip class="bg-grey-8 text-body2">Estimated daily gil traded (velocity × price)</q-tooltip>
+                </q-th>
+            ''')
+            
+            # Add slot templates for styled columns with zero-value highlighting
+            table.add_slot('body-cell-item_name', '''
+                <q-td :props="props" class="text-weight-bold" style="font-size: 1.05rem;">{{ props.row.item_name }}</q-td>
+            ''')
+            table.add_slot('body-cell-hq_velocity', '''
+                <q-td :props="props" :class="props.row.hq_velocity == 0 ? 'text-grey-5' : ''">
+                    <q-icon v-if="props.row.hq_velocity == 0" name="warning" class="text-amber-6 q-mr-xs" size="xs">
+                        <q-tooltip>No HQ sales recorded</q-tooltip>
+                    </q-icon>
+                    {{ props.row.hq_velocity_fmt }}
+                </q-td>
+            ''')
+            table.add_slot('body-cell-hq_min_price', '''
+                <q-td :props="props" :class="props.row.hq_min_price == 0 ? 'text-grey-5' : 'metric-price text-weight-bold'">
+                    <q-icon v-if="props.row.hq_min_price == 0" name="remove_shopping_cart" class="text-grey-5 q-mr-xs" size="xs">
+                        <q-tooltip>No HQ listings available</q-tooltip>
+                    </q-icon>
+                    {{ props.row.hq_min_price_fmt }}
+                </q-td>
+            ''')
+            table.add_slot('body-cell-gil_volume', '''
+                <q-td :props="props" class="metric-volume text-weight-bold">{{ props.row.gil_volume }}</q-td>
+            ''')
+            
             ui.label(f'Showing {len(results)} items').classes('text-sm text-gray-500 mt-2')
         
         set_status('Ready')
@@ -304,16 +372,16 @@ def generate_chart(state, service, world_options, world_name, container, set_sta
                     pct = (val / total) * 100
                     bar_width = pct
                     with ui.row().classes('items-center w-full gap-2'):
-                        ui.label(name).classes('w-40 truncate text-sm')
+                        ui.label(name).classes('w-40 truncate font-semibold')
                         ui.html(
-                            f'<div style="flex:1;background:#eee;height:20px;position:relative;border-radius:4px">'
-                            f'<div style="background:#1f77b4;width:{bar_width}%;height:20px;border-radius:4px"></div>'
-                            f'<span style="position:absolute;left:8px;top:2px;font-size:11px;color:#333">{format_gil(val)} gil ({pct:.1f}%)</span>'
+                            f'<div style="flex:1;background:#eee;height:24px;position:relative;border-radius:4px">'
+                            f'<div style="background:#1f77b4;width:{bar_width}%;height:24px;border-radius:4px"></div>'
+                            f'<span style="position:absolute;left:8px;top:3px;font-size:12px;font-weight:600;color:#333">{format_gil(val)} gil ({pct:.1f}%)</span>'
                             f'</div>',
                             sanitize=False
                         ).classes('flex-1')
             
-            ui.table(
+            chart_table = ui.table(
                 columns=[
                     {'name': 'rank', 'label': 'Rank', 'field': 'rank', 'align': 'center'},
                     {'name': 'item', 'label': 'Item', 'field': 'item', 'align': 'left'},
@@ -331,6 +399,14 @@ def generate_chart(state, service, world_options, world_name, container, set_sta
                 ],
                 row_key='rank'
             ).classes('w-full mt-4')
+            
+            # Add slot templates for styled columns
+            chart_table.add_slot('body-cell-item', '''
+                <q-td :props="props" class="text-weight-bold" style="font-size: 1.05rem;">{{ props.row.item }}</q-td>
+            ''')
+            chart_table.add_slot('body-cell-gil_volume', '''
+                <q-td :props="props" class="metric-volume text-weight-bold">{{ props.row.gil_volume }}</q-td>
+            ''')
         
         set_status('Ready')
     except Exception as e:

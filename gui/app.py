@@ -8,7 +8,7 @@ from nicegui import ui
 
 from .state import AppState
 from .utils import ThemeManager, GameIcons
-from .components import Header, Sidebar, Footer
+from .components import Header, Sidebar, Footer, render_breadcrumb
 from .views import (
     dashboard, datacenters, top_items,
     reports, settings, market_analysis
@@ -143,6 +143,14 @@ class UniversusGUI:
         self.clear_main_content()
         
         with self.main_content:
+            # Render breadcrumb navigation at the top
+            render_breadcrumb(
+                current_view=view,
+                selected_world=self.state.selected_world,
+                on_navigate=self.show_view,
+                dark_mode=self.theme.dark_mode
+            )
+            
             if view == 'dashboard':
                 self._render_dashboard()
             elif view == 'datacenters':
@@ -151,6 +159,8 @@ class UniversusGUI:
                 self._render_top_items()
             elif view == 'report':
                 self._render_report()
+            elif view == 'appearance':
+                self._render_appearance()
             elif view == 'import_static_data':
                 self._render_import_static_data()
             elif view == 'tracked_worlds':
@@ -234,6 +244,14 @@ class UniversusGUI:
                 )
             
             ui.button('Generate Report', icon=GameIcons.ANALYTICS, on_click=generate).props('color=primary').classes('mt-4')
+    
+    def _render_appearance(self):
+        """Render appearance settings view."""
+        settings.render_appearance_settings(
+            self.theme,
+            self.toggle_theme,
+            self.theme.dark_mode
+        )
     
     def _render_import_static_data(self):
         """Render import static data view."""
