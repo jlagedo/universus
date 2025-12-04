@@ -569,37 +569,62 @@ cursor.execute("""
 
 ---
 
+## Virtual Environment
+
+**IMPORTANT**: This project uses a Python virtual environment. Always use the venv when executing Python commands.
+
+### Python Executable Path
+
+```bash
+# Use this path for all Python commands:
+/Users/jlagedo/Developer/python/universus/.venv/bin/python
+
+# Examples:
+/Users/jlagedo/Developer/python/universus/.venv/bin/python universus.py --help
+/Users/jlagedo/Developer/python/universus/.venv/bin/python -m pytest -v
+/Users/jlagedo/Developer/python/universus/.venv/bin/python run_gui.py
+```
+
+### Why Use the venv?
+
+- Ensures all project dependencies are available
+- Avoids conflicts with system Python
+- Uses the correct Python version (3.14+)
+- Required for pytest, NiceGUI, and other packages
+
+---
+
 ## Quick Reference
 
 ### Running the Application
 
 ```bash
 # GUI
-python run_gui.py
+/Users/jlagedo/Developer/python/universus/.venv/bin/python run_gui.py
 
 # CLI
-python universus.py --help
-python universus.py top --world Behemoth
+/Users/jlagedo/Developer/python/universus/.venv/bin/python universus.py --help
+/Users/jlagedo/Developer/python/universus/.venv/bin/python universus.py top --world Behemoth
 
 # Tests
-pytest
-python run_tests.py --coverage --verbose
+/Users/jlagedo/Developer/python/universus/.venv/bin/python -m pytest
+/Users/jlagedo/Developer/python/universus/.venv/bin/python run_tests.py --coverage --verbose
 ```
 
 ### Common Commands
 
 ```bash
 # Import static data (items + marketable items)
-python universus.py import-static-data
+/Users/jlagedo/Developer/python/universus/.venv/bin/python universus.py isd
 
 # Add a world to track
-python universus.py tracked-worlds add --world Behemoth
+/Users/jlagedo/Developer/python/universus/.venv/bin/python universus.py tw a --world Behemoth
 
 # Update current prices (run daily)
-python universus.py update-current-prices
+/Users/jlagedo/Developer/python/universus/.venv/bin/python universus.py ucp
 
 # View reports
-python universus.py report --world Behemoth --item-id 5594 --days 30
+/Users/jlagedo/Developer/python/universus/.venv/bin/python universus.py report --world Behemoth --item-id 5594 --days 30
 ```
 
 ### Database Inspection

@@ -11,7 +11,7 @@ from .utils import ThemeManager, GameIcons
 from .components import Header, Sidebar, Footer
 from .views import (
     dashboard, datacenters, top_items,
-    reports, settings
+    reports, settings, market_analysis
 )
 
 logger = logging.getLogger(__name__)
@@ -179,6 +179,8 @@ class UniversusGUI:
                 self._render_sell_volume()
             elif view == 'sell_volume_chart':
                 self._render_sell_volume_chart()
+            elif view == 'market_analysis':
+                self._render_market_analysis()
     
     async def refresh_current_view(self):
         """Refresh the current view."""
@@ -315,6 +317,22 @@ class UniversusGUI:
                 )
             
             ui.button('Generate Chart', icon=GameIcons.CHART_PIE, on_click=generate).props('color=primary').classes('mt-4')
+    
+    def _render_market_analysis(self):
+        """Render market analysis view."""
+        world_options, world_select, search_input, results_container = market_analysis.render(
+            self.state, self.service, self.db, self.theme.dark_mode
+        )
+        
+        if world_options and world_select and results_container:
+            def generate():
+                search_term = search_input.value if search_input else ''
+                market_analysis.generate_analysis(
+                    self.state, self.db, world_options, world_select.value,
+                    search_term, results_container, self.set_status
+                )
+            
+            ui.button('Analyze Market', icon=GameIcons.ANALYTICS, on_click=generate).props('color=primary').classes('mt-4')
     
     async def initialize(self):
         """Initialize the GUI with data."""

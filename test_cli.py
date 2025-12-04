@@ -61,7 +61,7 @@ class TestCLI:
         mock_db_cls.return_value = Mock()
         mock_api_cls.return_value = Mock()
         
-        result = runner.invoke(cli, ['datacenters'])
+        result = runner.invoke(cli, ['dc'])
         
         assert result.exit_code == 0
         mock_service.get_datacenters.assert_called_once()
@@ -154,7 +154,7 @@ class TestCLI:
     @patch('universus.UniversalisAPI')
     @patch('universus.MarketService')
     def test_import_static_data_command(self, mock_service_cls, mock_api_cls, mock_db_cls, runner):
-        """Test import-static-data command."""
+        """Test import-static-data (isd) command."""
         mock_service = Mock()
         mock_service.sync_items_database.return_value = 47000
         mock_service.sync_marketable_items.return_value = 30000
@@ -162,7 +162,7 @@ class TestCLI:
         mock_db_cls.return_value = Mock()
         mock_api_cls.return_value = Mock()
         
-        result = runner.invoke(cli, ['import-static-data'])
+        result = runner.invoke(cli, ['isd'])
         
         assert result.exit_code == 0
         mock_service.sync_items_database.assert_called_once()
@@ -190,14 +190,14 @@ class TestCLI:
     @patch('universus.UniversalisAPI')
     @patch('universus.MarketService')
     def test_import_static_data_error(self, mock_service_cls, mock_api_cls, mock_db_cls, runner):
-        """Test import-static-data command with error."""
+        """Test import-static-data (isd) command with error."""
         mock_service = Mock()
         mock_service.sync_items_database.side_effect = Exception("Network Error")
         mock_service_cls.return_value = mock_service
         mock_db_cls.return_value = Mock()
         mock_api_cls.return_value = Mock()
         
-        result = runner.invoke(cli, ['import-static-data'])
+        result = runner.invoke(cli, ['isd'])
         
         # Should exit with error
         assert result.exit_code != 0
@@ -228,7 +228,7 @@ class TestCLI:
         mock_service.sync_marketable_items.return_value = 500
         mock_service_cls.return_value = mock_service
         
-        result = runner.invoke(cli, ['import-static-data'])
+        result = runner.invoke(cli, ['isd'])
         
         # Verify cleanup was called
         mock_db.close.assert_called_once()
@@ -253,6 +253,6 @@ class TestDatabaseIntegration:
         mock_service_cls.return_value = mock_service
         mock_api_cls.return_value = Mock()
         
-        result = runner.invoke(cli, ['--db-path', ':memory:', 'import-static-data'])
+        result = runner.invoke(cli, ['--db-path', ':memory:', 'isd'])
         
         assert result.exit_code == 0

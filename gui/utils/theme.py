@@ -52,6 +52,18 @@ h1, h2, h3, h4, h5, h6,
     font-family: var(--font-accent);
 }
 
+/* Table font sizing - ensure readable text */
+.q-table tbody td {
+    font-size: 0.925rem;
+    padding: 8px 12px;
+}
+
+.q-table thead th {
+    font-size: 0.925rem;
+    font-weight: 600;
+    padding: 10px 12px;
+}
+
 /* Buttons - Exo 2 for readability with gaming feel */
 .q-btn__content,
 .q-btn {

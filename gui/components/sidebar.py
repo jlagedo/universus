@@ -79,6 +79,13 @@ class Sidebar:
                     on_click=lambda: on_view_change('sell_volume_chart')
                 ).classes('w-full justify-start').props('flat align=left')
                 
+                # Market Analysis
+                ui.button(
+                    'Market Analysis',
+                    icon=GameIcons.CHART_BAR,
+                    on_click=lambda: on_view_change('market_analysis')
+                ).classes('w-full justify-start').props('flat align=left')
+                
                 ui.separator()
                 ui.label('Settings').classes(section_label_class)
                 

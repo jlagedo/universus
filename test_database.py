@@ -501,3 +501,139 @@ class TestMarketDatabase:
         # Total: 42,000
         assert volume['total_volume'] == 42000
         assert volume['item_count'] == 2
+
+    def test_save_aggregated_prices_full_response(self, db):
+        """Test saving complete aggregated price data matching API response structure."""
+        # Add tracked world
+        db.add_tracked_world(73, 'Adamantoise')
+        
+        # Full response structure matching the sample JSON
+        results = [{
+            'itemId': 47197,
+            'nq': {
+                'minListing': {
+                    'dc': {'price': 120000, 'worldId': 64},
+                    'region': {'price': 60000, 'worldId': 63}
+                },
+                'recentPurchase': {
+                    'world': {'price': 99993, 'timestamp': 1764457198000},
+                    'dc': {'price': 100000, 'timestamp': 1764638706000, 'worldId': 35},
+                    'region': {'price': 99296, 'timestamp': 1764696778000, 'worldId': 62}
+                },
+                'averageSalePrice': {
+                    'dc': {'price': 116664},
+                    'region': {'price': 139697.25}
+                },
+                'dailySaleVelocity': {
+                    'dc': {'quantity': 0.7547735840948842},
+                    'region': {'quantity': 2.0127295537351353}
+                }
+            },
+            'hq': {
+                'minListing': {
+                    'world': {'price': 199868},
+                    'dc': {'price': 174900, 'worldId': 95},
+                    'region': {'price': 129998, 'worldId': 63}
+                },
+                'recentPurchase': {
+                    'world': {'price': 199879, 'timestamp': 1764741789000},
+                    'dc': {'price': 169900, 'timestamp': 1764792412000, 'worldId': 95},
+                    'region': {'price': 247870, 'timestamp': 1764800672000, 'worldId': 41}
+                },
+                'averageSalePrice': {
+                    'world': {'price': 219357.625},
+                    'dc': {'price': 348649.62790697673},
+                    'region': {'price': 353121.26928104577}
+                },
+                'dailySaleVelocity': {
+                    'world': {'quantity': 12.076377367067643},
+                    'dc': {'quantity': 54.09210686013336},
+                    'region': {'quantity': 192.46726357592232}
+                }
+            },
+            'worldUploadTimes': [
+                {'worldId': 78, 'timestamp': 1764787086201},
+                {'worldId': 64, 'timestamp': 1764749804882},
+                {'worldId': 95, 'timestamp': 1764802094054},
+                {'worldId': 63, 'timestamp': 1764801609357}
+            ]
+        }]
+        
+        db.save_aggregated_prices(73, results)
+        
+        # Verify the record was saved
+        cursor = db.conn.cursor()
+        cursor.execute("SELECT * FROM current_prices WHERE item_id = 47197 AND tracked_world_id = 73")
+        row = cursor.fetchone()
+        
+        assert row is not None
+        assert row['item_id'] == 47197
+        assert row['tracked_world_id'] == 73
+        
+        # NQ fields
+        assert row['nq_dc_min_price'] == 120000
+        assert row['nq_dc_min_world_id'] == 64
+        assert row['nq_region_min_price'] == 60000
+        assert row['nq_region_min_world_id'] == 63
+        assert row['nq_world_recent_price'] == 99993
+        assert row['nq_world_recent_timestamp'] == 1764457198000
+        assert row['nq_dc_recent_price'] == 100000
+        assert row['nq_dc_recent_timestamp'] == 1764638706000
+        assert row['nq_dc_recent_world_id'] == 35
+        assert row['nq_dc_avg_price'] == 116664
+        assert abs(row['nq_region_avg_price'] - 139697.25) < 0.01
+        assert abs(row['nq_dc_daily_velocity'] - 0.7547735840948842) < 0.0001
+        assert abs(row['nq_region_daily_velocity'] - 2.0127295537351353) < 0.0001
+        
+        # HQ fields
+        assert row['hq_world_min_price'] == 199868
+        assert row['hq_dc_min_price'] == 174900
+        assert row['hq_dc_min_world_id'] == 95
+        assert row['hq_region_min_price'] == 129998
+        assert row['hq_region_min_world_id'] == 63
+        assert row['hq_world_recent_price'] == 199879
+        assert row['hq_world_recent_timestamp'] == 1764741789000
+        assert row['hq_dc_recent_price'] == 169900
+        assert row['hq_dc_recent_timestamp'] == 1764792412000
+        assert row['hq_dc_recent_world_id'] == 95
+        assert abs(row['hq_world_avg_price'] - 219357.625) < 0.01
+        assert abs(row['hq_dc_avg_price'] - 348649.62790697673) < 0.01
+        assert abs(row['hq_world_daily_velocity'] - 12.076377367067643) < 0.0001
+        assert abs(row['hq_dc_daily_velocity'] - 54.09210686013336) < 0.0001
+        assert abs(row['hq_region_daily_velocity'] - 192.46726357592232) < 0.0001
+        
+        # Verify world upload times were saved
+        price_id = row['id']
+        upload_times = db.get_world_upload_times(price_id)
+        assert len(upload_times) == 4
+        
+        # Check all upload times are present
+        upload_world_ids = {ut['worldId'] for ut in upload_times}
+        assert upload_world_ids == {78, 64, 95, 63}
+
+    def test_save_aggregated_prices_skips_missing_item_id(self, db):
+        """Test that records without itemId are skipped."""
+        db.add_tracked_world(73, 'Adamantoise')
+        
+        results = [
+            {'nq': {}, 'hq': {}},  # No itemId
+            {'itemId': 100, 'nq': {}, 'hq': {}}
+        ]
+        db.save_aggregated_prices(73, results)
+        
+        # Only one record should be saved
+        assert db.get_current_prices_count(73) == 1
+
+    def test_world_upload_times_table_exists(self, db):
+        """Test that world_upload_times table is created."""
+        cursor = db.conn.cursor()
+        cursor.execute("""
+            SELECT name FROM sqlite_master 
+            WHERE type='table' AND name='world_upload_times'
+        """)
+        assert cursor.fetchone() is not None
+
+    def test_get_world_upload_times_empty(self, db):
+        """Test getting world upload times for non-existent record."""
+        upload_times = db.get_world_upload_times(99999)
+        assert upload_times == []

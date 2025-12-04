@@ -118,17 +118,20 @@ class MarketDatabase:
         """)
         
         # Table for current aggregated prices per tracked world
+        # Stores all data from Universalis aggregated API response
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS current_prices (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 tracked_world_id INTEGER NOT NULL,
                 item_id INTEGER NOT NULL,
                 fetched_at TIMESTAMP NOT NULL,
+                -- NQ minListing (world, dc, region)
                 nq_world_min_price INTEGER,
                 nq_dc_min_price INTEGER,
                 nq_dc_min_world_id INTEGER,
                 nq_region_min_price INTEGER,
                 nq_region_min_world_id INTEGER,
+                -- NQ recentPurchase (world, dc, region)
                 nq_world_recent_price INTEGER,
                 nq_world_recent_timestamp INTEGER,
                 nq_dc_recent_price INTEGER,
@@ -137,13 +140,21 @@ class MarketDatabase:
                 nq_region_recent_price INTEGER,
                 nq_region_recent_timestamp INTEGER,
                 nq_region_recent_world_id INTEGER,
+                -- NQ averageSalePrice (world, dc, region)
+                nq_world_avg_price REAL,
+                nq_dc_avg_price REAL,
                 nq_region_avg_price REAL,
+                -- NQ dailySaleVelocity (world, dc, region)
+                nq_world_daily_velocity REAL,
+                nq_dc_daily_velocity REAL,
                 nq_region_daily_velocity REAL,
+                -- HQ minListing (world, dc, region)
                 hq_world_min_price INTEGER,
                 hq_dc_min_price INTEGER,
                 hq_dc_min_world_id INTEGER,
                 hq_region_min_price INTEGER,
                 hq_region_min_world_id INTEGER,
+                -- HQ recentPurchase (world, dc, region)
                 hq_world_recent_price INTEGER,
                 hq_world_recent_timestamp INTEGER,
                 hq_dc_recent_price INTEGER,
@@ -152,9 +163,11 @@ class MarketDatabase:
                 hq_region_recent_price INTEGER,
                 hq_region_recent_timestamp INTEGER,
                 hq_region_recent_world_id INTEGER,
+                -- HQ averageSalePrice (world, dc, region)
                 hq_world_avg_price REAL,
                 hq_dc_avg_price REAL,
                 hq_region_avg_price REAL,
+                -- HQ dailySaleVelocity (world, dc, region)
                 hq_world_daily_velocity REAL,
                 hq_dc_daily_velocity REAL,
                 hq_region_daily_velocity REAL
@@ -164,6 +177,21 @@ class MarketDatabase:
         cursor.execute("""
             CREATE UNIQUE INDEX IF NOT EXISTS idx_current_prices_unique_day
             ON current_prices(tracked_world_id, item_id, strftime('%Y-%m-%d', fetched_at))
+        """)
+        
+        # Table for world upload times (linked to current_prices)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS world_upload_times (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                current_price_id INTEGER NOT NULL,
+                world_id INTEGER NOT NULL,
+                upload_timestamp INTEGER NOT NULL,
+                FOREIGN KEY (current_price_id) REFERENCES current_prices(id) ON DELETE CASCADE
+            )
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_world_upload_times_price
+            ON world_upload_times(current_price_id)
         """)
         
         # Table for individual sales
@@ -482,80 +510,164 @@ class MarketDatabase:
     def save_aggregated_prices(self, tracked_world_id: int, results: List[Dict]):
         """Save aggregated prices results for a tracked world.
         
+        Stores all data from the aggregated API response including world upload times.
         Skips inserts that already exist for the same day due to UNIQUE constraint.
+        Failed items from the response are not stored.
+        
+        Args:
+            tracked_world_id: The tracked world ID (region identifier)
+            results: List of result items from the API response (excludes failedItems)
         """
-        def get_nested(d, *keys):
+        def get_nested(d: dict, *keys) -> dict:
             """Safely get nested dictionary values."""
             try:
                 for k in keys:
                     d = d.get(k, {})
-                return d
+                return d if isinstance(d, dict) else {}
             except AttributeError:
                 return {}
         
         with self._lock:
             cursor = self.conn.cursor()
             now = datetime.now().isoformat(sep=' ')
+            
             for item in results:
                 item_id = item.get('itemId')
+                if item_id is None:
+                    continue
+                    
                 nq = item.get('nq', {})
                 hq = item.get('hq', {})
+                world_upload_times = item.get('worldUploadTimes', [])
+                
+                # Insert the main price record
                 cursor.execute(
                     """
                     INSERT OR IGNORE INTO current_prices (
                         tracked_world_id, item_id, fetched_at,
-                        nq_world_min_price, nq_dc_min_price, nq_dc_min_world_id, nq_region_min_price, nq_region_min_world_id,
+                        -- NQ minListing
+                        nq_world_min_price, nq_dc_min_price, nq_dc_min_world_id,
+                        nq_region_min_price, nq_region_min_world_id,
+                        -- NQ recentPurchase
                         nq_world_recent_price, nq_world_recent_timestamp,
                         nq_dc_recent_price, nq_dc_recent_timestamp, nq_dc_recent_world_id,
                         nq_region_recent_price, nq_region_recent_timestamp, nq_region_recent_world_id,
-                        nq_region_avg_price, nq_region_daily_velocity,
-                        hq_world_min_price, hq_dc_min_price, hq_dc_min_world_id, hq_region_min_price, hq_region_min_world_id,
+                        -- NQ averageSalePrice
+                        nq_world_avg_price, nq_dc_avg_price, nq_region_avg_price,
+                        -- NQ dailySaleVelocity
+                        nq_world_daily_velocity, nq_dc_daily_velocity, nq_region_daily_velocity,
+                        -- HQ minListing
+                        hq_world_min_price, hq_dc_min_price, hq_dc_min_world_id,
+                        hq_region_min_price, hq_region_min_world_id,
+                        -- HQ recentPurchase
                         hq_world_recent_price, hq_world_recent_timestamp,
                         hq_dc_recent_price, hq_dc_recent_timestamp, hq_dc_recent_world_id,
                         hq_region_recent_price, hq_region_recent_timestamp, hq_region_recent_world_id,
+                        -- HQ averageSalePrice
                         hq_world_avg_price, hq_dc_avg_price, hq_region_avg_price,
+                        -- HQ dailySaleVelocity
                         hq_world_daily_velocity, hq_dc_daily_velocity, hq_region_daily_velocity
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ) VALUES (
+                        ?, ?, ?,
+                        ?, ?, ?, ?, ?,
+                        ?, ?, ?, ?, ?, ?, ?, ?,
+                        ?, ?, ?,
+                        ?, ?, ?,
+                        ?, ?, ?, ?, ?,
+                        ?, ?, ?, ?, ?, ?, ?, ?,
+                        ?, ?, ?,
+                        ?, ?, ?
+                    )
                     """,
                     (
                         tracked_world_id, item_id, now,
-                        nq.get('minListing', {}).get('world', {}).get('price'),
-                        nq.get('minListing', {}).get('dc', {}).get('price'),
-                        nq.get('minListing', {}).get('dc', {}).get('worldId'),
-                        nq.get('minListing', {}).get('region', {}).get('price'),
-                        nq.get('minListing', {}).get('region', {}).get('worldId'),
-                        nq.get('recentPurchase', {}).get('world', {}).get('price'),
-                        nq.get('recentPurchase', {}).get('world', {}).get('timestamp'),
-                        nq.get('recentPurchase', {}).get('dc', {}).get('price'),
-                        nq.get('recentPurchase', {}).get('dc', {}).get('timestamp'),
-                        nq.get('recentPurchase', {}).get('dc', {}).get('worldId'),
-                        nq.get('recentPurchase', {}).get('region', {}).get('price'),
-                        nq.get('recentPurchase', {}).get('region', {}).get('timestamp'),
-                        nq.get('recentPurchase', {}).get('region', {}).get('worldId'),
+                        # NQ minListing
+                        get_nested(nq, 'minListing', 'world').get('price'),
+                        get_nested(nq, 'minListing', 'dc').get('price'),
+                        get_nested(nq, 'minListing', 'dc').get('worldId'),
+                        get_nested(nq, 'minListing', 'region').get('price'),
+                        get_nested(nq, 'minListing', 'region').get('worldId'),
+                        # NQ recentPurchase
+                        get_nested(nq, 'recentPurchase', 'world').get('price'),
+                        get_nested(nq, 'recentPurchase', 'world').get('timestamp'),
+                        get_nested(nq, 'recentPurchase', 'dc').get('price'),
+                        get_nested(nq, 'recentPurchase', 'dc').get('timestamp'),
+                        get_nested(nq, 'recentPurchase', 'dc').get('worldId'),
+                        get_nested(nq, 'recentPurchase', 'region').get('price'),
+                        get_nested(nq, 'recentPurchase', 'region').get('timestamp'),
+                        get_nested(nq, 'recentPurchase', 'region').get('worldId'),
+                        # NQ averageSalePrice
+                        get_nested(nq, 'averageSalePrice', 'world').get('price'),
+                        get_nested(nq, 'averageSalePrice', 'dc').get('price'),
                         get_nested(nq, 'averageSalePrice', 'region').get('price'),
+                        # NQ dailySaleVelocity
+                        get_nested(nq, 'dailySaleVelocity', 'world').get('quantity'),
+                        get_nested(nq, 'dailySaleVelocity', 'dc').get('quantity'),
                         get_nested(nq, 'dailySaleVelocity', 'region').get('quantity'),
-                        hq.get('minListing', {}).get('world', {}).get('price'),
-                        hq.get('minListing', {}).get('dc', {}).get('price'),
-                        hq.get('minListing', {}).get('dc', {}).get('worldId'),
-                        hq.get('minListing', {}).get('region', {}).get('price'),
-                        hq.get('minListing', {}).get('region', {}).get('worldId'),
-                        hq.get('recentPurchase', {}).get('world', {}).get('price'),
-                        hq.get('recentPurchase', {}).get('world', {}).get('timestamp'),
-                        hq.get('recentPurchase', {}).get('dc', {}).get('price'),
-                        hq.get('recentPurchase', {}).get('dc', {}).get('timestamp'),
-                        hq.get('recentPurchase', {}).get('dc', {}).get('worldId'),
-                        hq.get('recentPurchase', {}).get('region', {}).get('price'),
-                        hq.get('recentPurchase', {}).get('region', {}).get('timestamp'),
-                        hq.get('recentPurchase', {}).get('region', {}).get('worldId'),
+                        # HQ minListing
+                        get_nested(hq, 'minListing', 'world').get('price'),
+                        get_nested(hq, 'minListing', 'dc').get('price'),
+                        get_nested(hq, 'minListing', 'dc').get('worldId'),
+                        get_nested(hq, 'minListing', 'region').get('price'),
+                        get_nested(hq, 'minListing', 'region').get('worldId'),
+                        # HQ recentPurchase
+                        get_nested(hq, 'recentPurchase', 'world').get('price'),
+                        get_nested(hq, 'recentPurchase', 'world').get('timestamp'),
+                        get_nested(hq, 'recentPurchase', 'dc').get('price'),
+                        get_nested(hq, 'recentPurchase', 'dc').get('timestamp'),
+                        get_nested(hq, 'recentPurchase', 'dc').get('worldId'),
+                        get_nested(hq, 'recentPurchase', 'region').get('price'),
+                        get_nested(hq, 'recentPurchase', 'region').get('timestamp'),
+                        get_nested(hq, 'recentPurchase', 'region').get('worldId'),
+                        # HQ averageSalePrice
                         get_nested(hq, 'averageSalePrice', 'world').get('price'),
                         get_nested(hq, 'averageSalePrice', 'dc').get('price'),
                         get_nested(hq, 'averageSalePrice', 'region').get('price'),
+                        # HQ dailySaleVelocity
                         get_nested(hq, 'dailySaleVelocity', 'world').get('quantity'),
                         get_nested(hq, 'dailySaleVelocity', 'dc').get('quantity'),
                         get_nested(hq, 'dailySaleVelocity', 'region').get('quantity'),
                     )
                 )
+                
+                # If the insert was successful (not ignored), save world upload times
+                if cursor.rowcount > 0 and world_upload_times:
+                    current_price_id = cursor.lastrowid
+                    for upload in world_upload_times:
+                        world_id = upload.get('worldId')
+                        timestamp = upload.get('timestamp')
+                        if world_id is not None and timestamp is not None:
+                            cursor.execute(
+                                """
+                                INSERT INTO world_upload_times (current_price_id, world_id, upload_timestamp)
+                                VALUES (?, ?, ?)
+                                """,
+                                (current_price_id, world_id, timestamp)
+                            )
+            
             self.conn.commit()
+    
+    def get_world_upload_times(self, current_price_id: int) -> List[Dict]:
+        """Get world upload times for a current_price record.
+        
+        Args:
+            current_price_id: The ID of the current_prices record
+            
+        Returns:
+            List of dicts with world_id and upload_timestamp
+        """
+        cursor = self.conn.cursor()
+        cursor.execute(
+            """
+            SELECT world_id, upload_timestamp
+            FROM world_upload_times
+            WHERE current_price_id = ?
+            ORDER BY upload_timestamp DESC
+            """,
+            (current_price_id,)
+        )
+        return [{'worldId': row['world_id'], 'timestamp': row['upload_timestamp']} 
+                for row in cursor.fetchall()]
     
     def get_items_updated_today(self, tracked_world_id: int) -> set:
         """Return a set of item_ids already updated today for the tracked world."""
