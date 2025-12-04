@@ -370,3 +370,156 @@ class TestUniversalisAPI:
         with pytest.raises(ValueError) as exc_info:
             api.get_history('../../../etc', 12345)
         assert 'Invalid world name' in str(exc_info.value)
+    
+    def test_get_worlds(self, api, mock_session):
+        """Test fetching worlds list."""
+        expected_data = [
+            {'id': 73, 'name': 'Adamantoise'},
+            {'id': 79, 'name': 'Cactuar'}
+        ]
+        
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = expected_data
+        mock_session.get.return_value = mock_response
+        
+        result = api.get_worlds()
+        
+        assert result == expected_data
+        assert len(result) == 2
+        assert 'v2/worlds' in mock_session.get.call_args[0][0]
+    
+    def test_get_aggregated_prices(self, api, mock_session):
+        """Test fetching aggregated prices."""
+        expected_data = {
+            'results': [
+                {'itemId': 5, 'hq': {}, 'nq': {}},
+                {'itemId': 6, 'hq': {}, 'nq': {}}
+            ]
+        }
+        
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = expected_data
+        mock_session.get.return_value = mock_response
+        
+        result = api.get_aggregated_prices('Behemoth', [5, 6])
+        
+        assert result == expected_data
+        url = mock_session.get.call_args[0][0]
+        assert 'v2/aggregated' in url
+        assert 'Behemoth' in url
+        assert '5,6' in url
+    
+    def test_get_marketable_items(self, api, mock_session):
+        """Test fetching marketable items list."""
+        expected_data = [5, 6, 7, 8, 9, 10]
+        
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = expected_data
+        mock_session.get.return_value = mock_response
+        
+        result = api.get_marketable_items()
+        
+        assert result == expected_data
+        assert len(result) == 6
+        assert 'v2/marketable' in mock_session.get.call_args[0][0]
+    
+    def test_fetch_teamcraft_items_success(self, api, mock_session):
+        """Test fetching Teamcraft items successfully."""
+        expected_data = {
+            '5': {'en': 'Item 5'},
+            '6': {'en': 'Item 6'}
+        }
+        
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = expected_data
+        mock_session.get.return_value = mock_response
+        
+        result = api.fetch_teamcraft_items()
+        
+        assert result == expected_data
+        assert '5' in result
+    
+    def test_fetch_teamcraft_items_retry_on_error(self, api, mock_session):
+        """Test that Teamcraft fetch retries on error."""
+        expected_data = {'5': {'en': 'Item 5'}}
+        
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = expected_data
+        
+        # First call fails, second succeeds
+        mock_session.get.side_effect = [
+            requests.RequestException("Network error"),
+            mock_response
+        ]
+        
+        result = api.fetch_teamcraft_items()
+        
+        assert result == expected_data
+        assert mock_session.get.call_count == 2
+    
+    def test_fetch_teamcraft_items_exhausted_retries(self, api, mock_session):
+        """Test that Teamcraft fetch fails after exhausted retries."""
+        mock_session.get.side_effect = requests.RequestException("Network error")
+        
+        with pytest.raises(requests.RequestException):
+            api.fetch_teamcraft_items()
+    
+    def test_world_validation_in_get_most_recently_updated(self, api, mock_session):
+        """Test that world name is validated in get_most_recently_updated."""
+        with pytest.raises(ValueError) as exc_info:
+            api.get_most_recently_updated('invalid;world', entries=100)
+        assert 'Invalid world name' in str(exc_info.value)
+    
+    def test_get_history_default_entries(self, api, mock_session):
+        """Test that get_history uses default entries from config."""
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {'entries': []}
+        mock_session.get.return_value = mock_response
+        
+        api.get_history('Behemoth', 12345)  # No entries specified
+        
+        call_args = mock_session.get.call_args
+        # Should use default from config (100)
+        assert 'entries' in call_args[1]['params']
+
+
+class TestRateLimiterEdgeCases:
+    """Test edge cases for RateLimiter."""
+    
+    def test_token_refill(self):
+        """Test that tokens refill over time."""
+        limiter = RateLimiter(requests_per_second=10.0, burst_size=1)
+        
+        # Consume the only token
+        limiter.wait()
+        assert limiter.tokens < 1.0
+        
+        # Wait for refill
+        time.sleep(0.15)  # Should add ~1.5 tokens at 10 req/s
+        
+        # Force refill calculation by calling wait
+        start = time.time()
+        limiter.wait()
+        elapsed = time.time() - start
+        
+        # Should be nearly instant since tokens have refilled
+        assert elapsed < 0.05
+    
+    def test_burst_capacity(self):
+        """Test burst capacity limits token accumulation."""
+        limiter = RateLimiter(requests_per_second=100.0, burst_size=5)
+        
+        # Wait a bit to accumulate tokens
+        time.sleep(0.1)  # Would add 10 tokens at 100 req/s
+        
+        # Force token calculation
+        limiter.wait()
+        
+        # Tokens should be capped at burst_size - 1 (since we consumed one)
+        assert limiter.tokens <= limiter.burst_size

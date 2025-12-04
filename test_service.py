@@ -393,3 +393,262 @@ class TestMarketService:
         mock_api.get_worlds.assert_called_once()
         mock_db.save_datacenters_cache.assert_called_once()
         mock_db.save_worlds_cache.assert_called_once()
+    
+    def test_sync_items_database(self, service, mock_db, mock_api):
+        """Test syncing items database."""
+        mock_api.fetch_teamcraft_items.return_value = {
+            '5': {'en': 'Item 5'},
+            '6': {'en': 'Item 6'}
+        }
+        mock_db.sync_items.return_value = 2
+        
+        result = service.sync_items_database()
+        
+        assert result == 2
+        mock_api.fetch_teamcraft_items.assert_called_once()
+        mock_db.sync_items.assert_called_once()
+    
+    def test_sync_marketable_items(self, service, mock_db, mock_api):
+        """Test syncing marketable items."""
+        mock_api.get_marketable_items.return_value = [5, 6, 7, 8]
+        mock_db.sync_marketable_items.return_value = 4
+        
+        result = service.sync_marketable_items()
+        
+        assert result == 4
+        mock_api.get_marketable_items.assert_called_once()
+        mock_db.sync_marketable_items.assert_called_once_with([5, 6, 7, 8])
+    
+    def test_add_tracked_world_by_name(self, service, mock_db, mock_api):
+        """Test adding a tracked world by name."""
+        mock_api.get_worlds.return_value = [
+            {'id': 73, 'name': 'Adamantoise'},
+            {'id': 79, 'name': 'Cactuar'}
+        ]
+        mock_db.add_tracked_world.return_value = True
+        
+        result = service.add_tracked_world(world='Adamantoise')
+        
+        assert result == {'id': 73, 'name': 'Adamantoise'}
+        mock_db.add_tracked_world.assert_called_once_with(73, 'Adamantoise')
+    
+    def test_add_tracked_world_by_id(self, service, mock_db, mock_api):
+        """Test adding a tracked world by ID."""
+        mock_api.get_worlds.return_value = [
+            {'id': 73, 'name': 'Adamantoise'}
+        ]
+        mock_db.add_tracked_world.return_value = True
+        
+        result = service.add_tracked_world(world_id=73)
+        
+        assert result == {'id': 73, 'name': 'Adamantoise'}
+    
+    def test_add_tracked_world_not_found(self, service, mock_api):
+        """Test adding a tracked world that doesn't exist."""
+        mock_api.get_worlds.return_value = [
+            {'id': 73, 'name': 'Adamantoise'}
+        ]
+        
+        with pytest.raises(ValueError) as exc_info:
+            service.add_tracked_world(world='NonExistentWorld')
+        assert 'World not found' in str(exc_info.value)
+    
+    def test_add_tracked_world_no_params(self, service):
+        """Test adding a tracked world without any parameters."""
+        with pytest.raises(ValueError) as exc_info:
+            service.add_tracked_world()
+        assert 'Either world name or world_id must be provided' in str(exc_info.value)
+    
+    def test_remove_tracked_world_by_name(self, service, mock_db, mock_api):
+        """Test removing a tracked world by name."""
+        mock_api.get_worlds.return_value = [
+            {'id': 73, 'name': 'Adamantoise'}
+        ]
+        mock_db.remove_tracked_world.return_value = True
+        
+        result = service.remove_tracked_world(world='Adamantoise')
+        
+        assert result is True
+        mock_db.remove_tracked_world.assert_called_once_with(73)
+    
+    def test_remove_tracked_world_not_found(self, service, mock_api):
+        """Test removing a world that doesn't exist."""
+        mock_api.get_worlds.return_value = [
+            {'id': 73, 'name': 'Adamantoise'}
+        ]
+        
+        with pytest.raises(ValueError) as exc_info:
+            service.remove_tracked_world(world='NonExistentWorld')
+        assert 'World not found' in str(exc_info.value)
+    
+    def test_list_tracked_worlds(self, service, mock_db):
+        """Test listing tracked worlds."""
+        expected = [
+            {'world_id': 73, 'world_name': 'Adamantoise'},
+            {'world_id': 79, 'world_name': 'Cactuar'}
+        ]
+        mock_db.list_tracked_worlds.return_value = expected
+        
+        result = service.list_tracked_worlds()
+        
+        assert result == expected
+        mock_db.list_tracked_worlds.assert_called_once()
+    
+    def test_clear_tracked_worlds(self, service, mock_db):
+        """Test clearing tracked worlds."""
+        service.clear_tracked_worlds()
+        
+        mock_db.clear_tracked_worlds.assert_called_once()
+    
+    def test_update_current_item_prices_no_tracked_worlds(self, service, mock_db):
+        """Test updating prices when no worlds are tracked."""
+        mock_db.list_tracked_worlds.return_value = []
+        
+        result = service.update_current_item_prices()
+        
+        assert result == {"worlds": 0, "items": 0, "updated": 0, "skipped": 0}
+    
+    def test_update_current_item_prices_no_marketable_items(self, service, mock_db):
+        """Test updating prices when no marketable items exist."""
+        mock_db.list_tracked_worlds.return_value = [{'world_id': 73, 'world_name': 'Adamantoise'}]
+        mock_db.get_marketable_item_ids.return_value = []
+        
+        result = service.update_current_item_prices()
+        
+        assert result == {"worlds": 1, "items": 0, "updated": 0, "skipped": 0}
+    
+    def test_update_current_item_prices_skips_updated_today(self, service, mock_db, mock_api):
+        """Test that items already updated today are skipped."""
+        mock_db.list_tracked_worlds.return_value = [{'world_id': 73, 'world_name': 'Adamantoise'}]
+        mock_db.get_marketable_item_ids.return_value = [5, 6, 7]
+        mock_db.get_items_updated_today.return_value = {5, 6}  # Items 5 and 6 already updated
+        mock_api.get_aggregated_prices.return_value = {'results': [{'itemId': 7}]}
+        
+        result = service.update_current_item_prices()
+        
+        assert result['skipped'] == 2
+        assert result['updated'] == 1
+    
+    def test_update_current_item_prices_batches_requests(self, service, mock_db, mock_api):
+        """Test that requests are batched correctly."""
+        mock_db.list_tracked_worlds.return_value = [{'world_id': 73, 'world_name': 'Adamantoise'}]
+        # Create more items than batch size
+        mock_db.get_marketable_item_ids.return_value = list(range(150))
+        mock_db.get_items_updated_today.return_value = set()
+        mock_api.get_aggregated_prices.return_value = {'results': []}
+        
+        service.update_current_item_prices()
+        
+        # Should make 2 API calls (100 + 50 items)
+        assert mock_api.get_aggregated_prices.call_count == 2
+    
+    def test_get_tracked_worlds_count(self, service, mock_db):
+        """Test getting tracked worlds count."""
+        mock_db.get_tracked_worlds_count.return_value = 5
+        
+        result = service.get_tracked_worlds_count()
+        
+        assert result == 5
+        mock_db.get_tracked_worlds_count.assert_called_once()
+    
+    def test_get_current_prices_count(self, service, mock_db):
+        """Test getting current prices count."""
+        mock_db.get_current_prices_count.return_value = 100
+        
+        result = service.get_current_prices_count()
+        
+        assert result == 100
+        mock_db.get_current_prices_count.assert_called_once_with(None)
+    
+    def test_get_current_prices_count_by_world(self, service, mock_db):
+        """Test getting current prices count for specific world."""
+        mock_db.get_current_prices_count.return_value = 50
+        
+        result = service.get_current_prices_count(73)
+        
+        assert result == 50
+        mock_db.get_current_prices_count.assert_called_once_with(73)
+    
+    def test_get_marketable_items_count(self, service, mock_db):
+        """Test getting marketable items count."""
+        mock_db.get_marketable_items_count.return_value = 2000
+        
+        result = service.get_marketable_items_count()
+        
+        assert result == 2000
+        mock_db.get_marketable_items_count.assert_called_once()
+    
+    def test_get_items_count(self, service, mock_db):
+        """Test getting items count."""
+        mock_db.get_items_count.return_value = 30000
+        
+        result = service.get_items_count()
+        
+        assert result == 30000
+        mock_db.get_items_count.assert_called_once()
+    
+    def test_get_datacenter_gil_volume(self, service, mock_db):
+        """Test getting datacenter gil volume."""
+        expected = {'hq_volume': 10000, 'nq_volume': 5000, 'total_volume': 15000, 'item_count': 10}
+        mock_db.get_datacenter_gil_volume.return_value = expected
+        
+        result = service.get_datacenter_gil_volume(73)
+        
+        assert result == expected
+        mock_db.get_datacenter_gil_volume.assert_called_once_with(73)
+    
+    def test_get_top_items_by_hq_velocity(self, service, mock_db):
+        """Test getting top items by HQ velocity."""
+        expected = [
+            {'item_id': 5, 'hq_world_daily_velocity': 100},
+            {'item_id': 6, 'hq_world_daily_velocity': 50}
+        ]
+        mock_db.get_top_items_by_hq_velocity.return_value = expected
+        
+        result = service.get_top_items_by_hq_velocity(73, limit=10)
+        
+        assert result == expected
+        mock_db.get_top_items_by_hq_velocity.assert_called_once_with(73, 10)
+    
+    def test_get_item_name(self, service, mock_db):
+        """Test getting item name by ID."""
+        mock_db.get_item_name.return_value = 'Test Item'
+        
+        result = service.get_item_name(5)
+        
+        assert result == 'Test Item'
+        mock_db.get_item_name.assert_called_once_with(5)
+    
+    def test_get_item_name_not_found(self, service, mock_db):
+        """Test getting item name when not found."""
+        mock_db.get_item_name.return_value = None
+        
+        result = service.get_item_name(99999)
+        
+        assert result is None
+    
+    def test_calculate_trends_zero_oldest_velocity(self, service):
+        """Test trend calculation when oldest velocity is zero."""
+        snapshots = [
+            {'sale_velocity': 10.0, 'average_price': 1000},
+            {'sale_velocity': 0, 'average_price': 900}
+        ]
+        
+        trends = service.calculate_trends(snapshots)
+        
+        # Should not calculate velocity change when oldest is zero
+        assert 'velocity_change' not in trends
+        assert 'price_change' in trends
+    
+    def test_calculate_trends_zero_oldest_price(self, service):
+        """Test trend calculation when oldest price is zero."""
+        snapshots = [
+            {'sale_velocity': 10.0, 'average_price': 1000},
+            {'sale_velocity': 8.0, 'average_price': 0}
+        ]
+        
+        trends = service.calculate_trends(snapshots)
+        
+        assert 'velocity_change' in trends
+        # Should not calculate price change when oldest is zero
+        assert 'price_change' not in trends

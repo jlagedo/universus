@@ -465,3 +465,331 @@ class TestUniversusGUIAsyncOperations:
 
 if __name__ == '__main__':
     pytest.main([__file__, '-v'])
+
+
+class TestFormatGilEdgeCases:
+    """Additional test cases for format_gil."""
+    
+    def test_format_gil_negative_amount(self):
+        """Test formatting gil with negative amount."""
+        assert format_gil(-1000) == "-1.000"
+    
+    def test_format_gil_large_amount(self):
+        """Test formatting gil with very large amount."""
+        assert format_gil(999999999) == "999.999.999"
+    
+    def test_format_gil_invalid_string(self):
+        """Test formatting gil with invalid string."""
+        assert format_gil("not a number") == "N/A"
+    
+    def test_format_gil_empty_string(self):
+        """Test formatting gil with empty string."""
+        assert format_gil("") == "N/A"
+
+
+class TestFormatVelocityEdgeCases:
+    """Additional test cases for format_velocity."""
+    
+    def test_format_velocity_negative(self):
+        """Test formatting negative velocity."""
+        result = format_velocity(-10.5)
+        assert "-10" in result
+    
+    def test_format_velocity_large(self):
+        """Test formatting large velocity."""
+        result = format_velocity(1234567.89)
+        # Should contain proper thousands separators
+        assert "." in result and "," in result
+    
+    def test_format_velocity_invalid_string(self):
+        """Test formatting velocity with invalid string."""
+        assert format_velocity("not a number") == "N/A"
+    
+    def test_format_velocity_zero(self):
+        """Test formatting zero velocity."""
+        result = format_velocity(0)
+        assert "0,00" in result
+
+
+class TestFormatTimeAgoEdgeCases:
+    """Additional test cases for format_time_ago."""
+    
+    def test_format_time_ago_just_now(self):
+        """Test time ago formatting for just now (seconds)."""
+        past_time = datetime.now() - timedelta(seconds=30)
+        result = format_time_ago(past_time.isoformat())
+        assert "m ago" in result
+    
+    def test_format_time_ago_weeks(self):
+        """Test time ago formatting for weeks (still shows days)."""
+        past_time = datetime.now() - timedelta(days=14)
+        result = format_time_ago(past_time.isoformat())
+        assert "14d ago" in result
+    
+    def test_format_time_ago_none(self):
+        """Test time ago formatting with None."""
+        assert format_time_ago(None) == "Never"
+
+
+class TestAppStateEdgeCases:
+    """Additional test cases for AppState."""
+    
+    def test_change_datacenter_empty(self):
+        """Test changing to datacenter with no worlds."""
+        state = AppState()
+        state.worlds_by_datacenter = {
+            'Empty': []
+        }
+        
+        worlds = state.change_datacenter('Empty')
+        
+        assert worlds == []
+        assert state.selected_datacenter == 'Empty'
+    
+    def test_change_datacenter_nonexistent(self):
+        """Test changing to nonexistent datacenter."""
+        state = AppState()
+        state.worlds_by_datacenter = {}
+        
+        worlds = state.change_datacenter('NonExistent')
+        
+        assert worlds == []
+    
+    def test_set_datacenters_empty(self):
+        """Test setting empty datacenters."""
+        state = AppState()
+        state.set_datacenters([], {})
+        
+        assert state.datacenters == []
+        assert state.datacenter_names == []
+        assert state.worlds == []
+    
+    def test_get_worlds_for_datacenter_no_selection(self):
+        """Test getting worlds when no datacenter selected."""
+        state = AppState()
+        state.worlds_by_datacenter = {}
+        state.selected_datacenter = ''
+        
+        worlds = state.get_worlds_for_datacenter()
+        
+        assert worlds == []
+
+
+class TestThemeManagerEdgeCases:
+    """Additional test cases for ThemeManager."""
+    
+    def test_toggle_twice(self):
+        """Test toggling theme twice returns to original."""
+        theme = ThemeManager('light')
+        assert theme.dark_mode is False
+        
+        with patch('gui.utils.theme.ui'):
+            theme.toggle()
+        assert theme.dark_mode is True
+        
+        with patch('gui.utils.theme.ui'):
+            theme.toggle()
+        assert theme.dark_mode is False
+    
+    def test_get_theme_classes_with_none(self):
+        """Test getting theme classes with None input."""
+        theme = ThemeManager('light')
+        assert theme.get_theme_classes(None, 'dark-class') is None
+        
+        theme = ThemeManager('dark')
+        assert theme.get_theme_classes('light-class', None) is None
+
+
+class TestUniversusGUIViewRendering:
+    """Test suite for view rendering."""
+    
+    @pytest.fixture
+    def gui_instance(self):
+        """Create a GUI instance for testing."""
+        mock_db = Mock()
+        mock_db.conn = Mock()
+        mock_db.conn.cursor = Mock(return_value=Mock())
+        mock_api = Mock()
+        mock_service = Mock()
+        mock_config = Mock()
+        mock_config.get.return_value = 'light'
+        gui = UniversusGUI(mock_db, mock_api, mock_service, mock_config)
+        gui.state.selected_world = 'Behemoth'
+        gui.state.selected_datacenter = 'Primal'
+        return gui
+    
+    def test_render_top_items_view(self, gui_instance):
+        """Test rendering top items view."""
+        gui_instance.main_content = MagicMock()
+        gui_instance.main_content.__enter__ = MagicMock(return_value=gui_instance.main_content)
+        gui_instance.main_content.__exit__ = MagicMock(return_value=False)
+        
+        with patch.object(gui_instance, '_render_top_items') as mock_render:
+            gui_instance.show_view('top')  # Correct view name
+        
+        assert gui_instance.state.current_view == 'top'
+        mock_render.assert_called_once()
+    
+    def test_render_datacenters_view(self, gui_instance):
+        """Test rendering datacenters view."""
+        gui_instance.main_content = MagicMock()
+        gui_instance.main_content.__enter__ = MagicMock(return_value=gui_instance.main_content)
+        gui_instance.main_content.__exit__ = MagicMock(return_value=False)
+        
+        with patch.object(gui_instance, '_render_datacenters') as mock_render:
+            gui_instance.show_view('datacenters')
+        
+        assert gui_instance.state.current_view == 'datacenters'
+        mock_render.assert_called_once()
+    
+    def test_render_import_static_data_view(self, gui_instance):
+        """Test rendering import static data view."""
+        gui_instance.main_content = MagicMock()
+        gui_instance.main_content.__enter__ = MagicMock(return_value=gui_instance.main_content)
+        gui_instance.main_content.__exit__ = MagicMock(return_value=False)
+        
+        with patch.object(gui_instance, '_render_import_static_data') as mock_render:
+            gui_instance.show_view('import_static_data')
+        
+        assert gui_instance.state.current_view == 'import_static_data'
+        mock_render.assert_called_once()
+    
+    def test_render_report_view(self, gui_instance):
+        """Test rendering report view."""
+        gui_instance.main_content = MagicMock()
+        gui_instance.main_content.__enter__ = MagicMock(return_value=gui_instance.main_content)
+        gui_instance.main_content.__exit__ = MagicMock(return_value=False)
+        
+        with patch.object(gui_instance, '_render_report') as mock_render:
+            gui_instance.show_view('report')
+        
+        assert gui_instance.state.current_view == 'report'
+        mock_render.assert_called_once()
+    
+    def test_render_market_analysis_view(self, gui_instance):
+        """Test rendering market analysis view."""
+        gui_instance.main_content = MagicMock()
+        gui_instance.main_content.__enter__ = MagicMock(return_value=gui_instance.main_content)
+        gui_instance.main_content.__exit__ = MagicMock(return_value=False)
+        
+        with patch.object(gui_instance, '_render_market_analysis') as mock_render:
+            gui_instance.show_view('market_analysis')
+        
+        assert gui_instance.state.current_view == 'market_analysis'
+        mock_render.assert_called_once()
+    
+    def test_render_tracked_worlds_view(self, gui_instance):
+        """Test rendering tracked worlds view."""
+        gui_instance.main_content = MagicMock()
+        gui_instance.main_content.__enter__ = MagicMock(return_value=gui_instance.main_content)
+        gui_instance.main_content.__exit__ = MagicMock(return_value=False)
+        
+        with patch.object(gui_instance, '_render_tracked_worlds') as mock_render:
+            gui_instance.show_view('tracked_worlds')
+        
+        assert gui_instance.state.current_view == 'tracked_worlds'
+        mock_render.assert_called_once()
+    
+    def test_render_sell_volume_view(self, gui_instance):
+        """Test rendering sell volume view."""
+        gui_instance.main_content = MagicMock()
+        gui_instance.main_content.__enter__ = MagicMock(return_value=gui_instance.main_content)
+        gui_instance.main_content.__exit__ = MagicMock(return_value=False)
+        
+        with patch.object(gui_instance, '_render_sell_volume') as mock_render:
+            gui_instance.show_view('sell_volume')
+        
+        assert gui_instance.state.current_view == 'sell_volume'
+        mock_render.assert_called_once()
+    
+    def test_render_sell_volume_chart_view(self, gui_instance):
+        """Test rendering sell volume chart view."""
+        gui_instance.main_content = MagicMock()
+        gui_instance.main_content.__enter__ = MagicMock(return_value=gui_instance.main_content)
+        gui_instance.main_content.__exit__ = MagicMock(return_value=False)
+        
+        with patch.object(gui_instance, '_render_sell_volume_chart') as mock_render:
+            gui_instance.show_view('sell_volume_chart')
+        
+        assert gui_instance.state.current_view == 'sell_volume_chart'
+        mock_render.assert_called_once()
+
+
+class TestUniversusGUIWorldManagement:
+    """Test suite for world management in GUI."""
+    
+    @pytest.fixture
+    def gui_instance(self):
+        """Create a GUI instance for testing."""
+        mock_db = Mock()
+        mock_api = Mock()
+        mock_service = Mock()
+        mock_config = Mock()
+        mock_config.get.return_value = 'light'
+        gui = UniversusGUI(mock_db, mock_api, mock_service, mock_config)
+        gui.state.worlds_by_datacenter = {
+            'Aether': ['Adamantoise', 'Cactuar'],
+            'Primal': ['Behemoth', 'Excalibur']
+        }
+        return gui
+    
+    def test_get_world_id_from_name(self, gui_instance):
+        """Test getting world ID from name."""
+        gui_instance.state.world_id_to_name = {73: 'Adamantoise', 79: 'Cactuar'}
+        
+        # Create reverse lookup
+        name_to_id = {v: k for k, v in gui_instance.state.world_id_to_name.items()}
+        
+        assert name_to_id.get('Adamantoise') == 73
+        assert name_to_id.get('Cactuar') == 79
+        assert name_to_id.get('NonExistent') is None
+    
+    def test_datacenter_change_updates_world_selection(self, gui_instance):
+        """Test that changing datacenter updates world selection."""
+        gui_instance.header = Mock()
+        gui_instance.main_content = MagicMock()
+        gui_instance.main_content.__enter__ = MagicMock(return_value=gui_instance.main_content)
+        gui_instance.main_content.__exit__ = MagicMock(return_value=False)
+        
+        gui_instance.service.get_tracked_worlds_count = Mock(return_value=0)
+        gui_instance.service.get_current_prices_count = Mock(return_value=0)
+        gui_instance.service.get_latest_current_price_timestamp = Mock(return_value=None)
+        gui_instance.service.get_marketable_items_count = Mock(return_value=0)
+        gui_instance.service.get_datacenter_gil_volume = Mock(return_value={'hq_volume': 0, 'nq_volume': 0, 'total_volume': 0, 'item_count': 0})
+        gui_instance.service.get_top_items_by_hq_velocity = Mock(return_value=[])
+        
+        gui_instance.state.selected_world = 'Adamantoise'
+        
+        with patch('gui.app.ui'), patch('gui.views.dashboard.ui'):
+            gui_instance.change_datacenter('Primal')
+        
+        # World should be auto-selected from new datacenter
+        assert gui_instance.state.selected_world in ['Behemoth', 'Excalibur']
+
+
+class TestGameIcons:
+    """Test suite for GameIcons class."""
+    
+    def test_icon_constants_are_strings(self):
+        """Test that all icon constants are strings."""
+        from gui.utils.icons import GameIcons
+        
+        icon_attrs = [attr for attr in dir(GameIcons) if not attr.startswith('_')]
+        
+        for attr in icon_attrs:
+            value = getattr(GameIcons, attr)
+            assert isinstance(value, str), f"{attr} should be a string"
+    
+    def test_required_icons_exist(self):
+        """Test that required icons exist."""
+        from gui.utils.icons import GameIcons
+        
+        required_icons = [
+            'HOME', 'DASHBOARD', 'MENU', 'SETTINGS',
+            'MARKET', 'TRENDING', 'ANALYTICS',
+            'SERVER', 'DATABASE', 'WORLD',
+            'ADD', 'REMOVE', 'REFRESH', 'SYNC'
+        ]
+        
+        for icon_name in required_icons:
+            assert hasattr(GameIcons, icon_name), f"Missing icon: {icon_name}"

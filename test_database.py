@@ -637,3 +637,246 @@ class TestMarketDatabase:
         """Test getting world upload times for non-existent record."""
         upload_times = db.get_world_upload_times(99999)
         assert upload_times == []
+
+
+class TestTrackedWorlds:
+    """Test suite for tracked worlds functionality."""
+    
+    def test_add_tracked_world(self, db):
+        """Test adding a tracked world."""
+        result = db.add_tracked_world(73, 'Adamantoise')
+        assert result is True
+        
+        worlds = db.list_tracked_worlds()
+        assert len(worlds) == 1
+        assert worlds[0]['world_id'] == 73
+        assert worlds[0]['world_name'] == 'Adamantoise'
+    
+    def test_add_duplicate_tracked_world(self, db):
+        """Test that duplicate tracked worlds are ignored."""
+        db.add_tracked_world(73, 'Adamantoise')
+        result = db.add_tracked_world(73, 'Adamantoise')
+        
+        assert result is False
+        worlds = db.list_tracked_worlds()
+        assert len(worlds) == 1
+    
+    def test_remove_tracked_world(self, db):
+        """Test removing a tracked world."""
+        db.add_tracked_world(73, 'Adamantoise')
+        db.add_tracked_world(79, 'Cactuar')
+        
+        result = db.remove_tracked_world(73)
+        
+        assert result is True
+        worlds = db.list_tracked_worlds()
+        assert len(worlds) == 1
+        assert worlds[0]['world_id'] == 79
+    
+    def test_remove_nonexistent_tracked_world(self, db):
+        """Test removing a world that doesn't exist."""
+        result = db.remove_tracked_world(99999)
+        
+        assert result is False
+    
+    def test_list_tracked_worlds_sorted(self, db):
+        """Test that tracked worlds are sorted by name."""
+        db.add_tracked_world(79, 'Cactuar')
+        db.add_tracked_world(73, 'Adamantoise')
+        db.add_tracked_world(54, 'Behemoth')
+        
+        worlds = db.list_tracked_worlds()
+        
+        assert len(worlds) == 3
+        assert worlds[0]['world_name'] == 'Adamantoise'
+        assert worlds[1]['world_name'] == 'Behemoth'
+        assert worlds[2]['world_name'] == 'Cactuar'
+    
+    def test_clear_tracked_worlds(self, db):
+        """Test clearing all tracked worlds."""
+        db.add_tracked_world(73, 'Adamantoise')
+        db.add_tracked_world(79, 'Cactuar')
+        
+        db.clear_tracked_worlds()
+        
+        worlds = db.list_tracked_worlds()
+        assert len(worlds) == 0
+    
+    def test_get_tracked_worlds_count(self, db):
+        """Test getting tracked worlds count."""
+        assert db.get_tracked_worlds_count() == 0
+        
+        db.add_tracked_world(73, 'Adamantoise')
+        db.add_tracked_world(79, 'Cactuar')
+        
+        assert db.get_tracked_worlds_count() == 2
+
+
+class TestMarketableItems:
+    """Test suite for marketable items functionality."""
+    
+    def test_sync_marketable_items(self, db):
+        """Test syncing marketable items."""
+        item_ids = [5, 6, 7, 8, 9]
+        count = db.sync_marketable_items(item_ids)
+        
+        assert count == 5
+        
+        # Verify items were saved
+        stored = db.get_marketable_item_ids()
+        assert len(stored) == 5
+        assert set(stored) == set(item_ids)
+    
+    def test_sync_marketable_items_replaces_existing(self, db):
+        """Test that syncing replaces existing items."""
+        db.sync_marketable_items([1, 2, 3])
+        db.sync_marketable_items([4, 5])
+        
+        stored = db.get_marketable_item_ids()
+        assert len(stored) == 2
+        assert set(stored) == {4, 5}
+    
+    def test_get_marketable_items_count(self, db):
+        """Test getting marketable items count."""
+        assert db.get_marketable_items_count() == 0
+        
+        db.sync_marketable_items([1, 2, 3, 4, 5])
+        
+        assert db.get_marketable_items_count() == 5
+
+
+class TestItemsSync:
+    """Test suite for items sync functionality."""
+    
+    def test_sync_items(self, db):
+        """Test syncing items from Teamcraft data."""
+        items_data = {
+            '5': {'en': 'Item 5'},
+            '6': {'en': 'Item 6'},
+            '7': {'en': 'Item 7'}
+        }
+        
+        count = db.sync_items(items_data)
+        
+        assert count == 3
+    
+    def test_sync_items_skips_empty_names(self, db):
+        """Test that items with empty names are skipped."""
+        items_data = {
+            '5': {'en': 'Item 5'},
+            '6': {'en': ''},  # Empty name
+            '7': {}  # No 'en' key
+        }
+        
+        count = db.sync_items(items_data)
+        
+        assert count == 1
+    
+    def test_sync_items_skips_invalid_ids(self, db):
+        """Test that items with invalid IDs are skipped."""
+        items_data = {
+            '5': {'en': 'Item 5'},
+            'invalid': {'en': 'Invalid Item'},
+            '': {'en': 'Empty ID'}
+        }
+        
+        count = db.sync_items(items_data)
+        
+        assert count == 1
+    
+    def test_get_item_name(self, db):
+        """Test getting item name by ID."""
+        db.sync_items({'5': {'en': 'Test Item'}})
+        
+        name = db.get_item_name(5)
+        
+        assert name == 'Test Item'
+    
+    def test_get_item_name_not_found(self, db):
+        """Test getting item name when not found."""
+        name = db.get_item_name(99999)
+        
+        assert name is None
+    
+    def test_get_items_count(self, db):
+        """Test getting items count."""
+        assert db.get_items_count() == 0
+        
+        db.sync_items({'5': {'en': 'Item 5'}, '6': {'en': 'Item 6'}})
+        
+        assert db.get_items_count() == 2
+
+
+class TestItemsUpdatedToday:
+    """Test suite for items updated today functionality."""
+    
+    def test_get_items_updated_today_empty(self, db):
+        """Test getting items updated today when none exist."""
+        db.add_tracked_world(73, 'Adamantoise')
+        
+        updated = db.get_items_updated_today(73)
+        
+        assert updated == set()
+    
+    def test_get_items_updated_today(self, db):
+        """Test getting items updated today."""
+        db.add_tracked_world(73, 'Adamantoise')
+        
+        # Add some price data
+        results = [
+            {'itemId': 5, 'hq': {}, 'nq': {}},
+            {'itemId': 6, 'hq': {}, 'nq': {}}
+        ]
+        db.save_aggregated_prices(73, results)
+        
+        updated = db.get_items_updated_today(73)
+        
+        assert updated == {5, 6}
+
+
+class TestDatabaseEdgeCases:
+    """Test edge cases in database operations."""
+    
+    def test_save_snapshot_with_empty_data(self, db):
+        """Test saving snapshot with empty data."""
+        db.add_tracked_item(12345, "Behemoth")
+        
+        # Empty data dict
+        db.save_snapshot(12345, "Behemoth", {})
+        
+        # Should not raise error
+        snapshots = db.get_snapshots(12345, "Behemoth", days=1)
+        assert len(snapshots) == 1
+    
+    def test_save_sales_empty_list(self, db):
+        """Test saving empty sales list."""
+        db.add_tracked_item(12345, "Behemoth")
+        
+        db.save_sales(12345, "Behemoth", [])
+        
+        # Should not raise error
+        cursor = db.conn.cursor()
+        cursor.execute("SELECT COUNT(*) as count FROM sales_history")
+        count = cursor.fetchone()['count']
+        assert count == 0
+    
+    def test_get_snapshots_no_data(self, db):
+        """Test getting snapshots when no data exists."""
+        snapshots = db.get_snapshots(99999, "NonExistentWorld", days=30)
+        
+        assert snapshots == []
+    
+    def test_save_aggregated_prices_empty_nested(self, db):
+        """Test saving aggregated prices with empty nested objects."""
+        db.add_tracked_world(73, 'Adamantoise')
+        
+        results = [{
+            'itemId': 100,
+            'hq': {},
+            'nq': {}
+        }]
+        
+        db.save_aggregated_prices(73, results)
+        
+        # Should save with null values
+        assert db.get_current_prices_count(73) == 1

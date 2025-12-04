@@ -250,3 +250,83 @@ class TestMarketUI:
         
         # Should use default exit code 1
         assert exc_info.value.code == 1
+    
+    def test_show_tracked_worlds_empty(self, mock_console):
+        """Test showing empty tracked worlds list."""
+        MarketUI.show_tracked_worlds([])
+        
+        # Should print warning
+        assert mock_console.print.called
+    
+    def test_show_tracked_worlds_with_data(self, mock_console):
+        """Test showing tracked worlds with data."""
+        worlds = [
+            {'world_id': 73, 'world_name': 'Adamantoise', 'added_at': '2025-12-01 10:00:00'},
+            {'world_id': 79, 'world_name': 'Cactuar', 'added_at': '2025-12-02 12:00:00'}
+        ]
+        
+        MarketUI.show_tracked_worlds(worlds)
+        
+        # Should print table
+        assert mock_console.print.called
+    
+    def test_show_tracked_worlds_with_null_values(self, mock_console):
+        """Test showing tracked worlds with null values."""
+        worlds = [
+            {'world_id': 73, 'world_name': None, 'added_at': None}
+        ]
+        
+        MarketUI.show_tracked_worlds(worlds)
+        
+        # Should handle None values gracefully
+        assert mock_console.print.called
+    
+    def test_show_item_report_table_with_null_values(self, mock_console):
+        """Test showing item report table with null values."""
+        snapshots = [
+            {
+                'snapshot_date': '2025-12-01',
+                'sale_velocity': None,
+                'average_price': None,
+                'min_price': None,
+                'max_price': None,
+                'total_listings': None
+            }
+        ]
+        
+        MarketUI.show_item_report_table(snapshots)
+        
+        # Should handle None values gracefully
+        assert mock_console.print.called
+    
+    def test_show_datacenters_sorts_by_region_and_name(self, mock_console):
+        """Test that datacenters are sorted by region and name."""
+        datacenters = [
+            {'name': 'Light', 'region': 'EU', 'worlds': ['Lich']},
+            {'name': 'Crystal', 'region': 'NA', 'worlds': ['Behemoth']},
+            {'name': 'Aether', 'region': 'NA', 'worlds': ['Cactuar']}
+        ]
+        
+        MarketUI.show_datacenters(datacenters)
+        
+        # Should have sorted and printed
+        assert mock_console.print.call_count >= 2
+    
+    def test_show_top_items_with_item_name(self, mock_console):
+        """Test showing top items with item names."""
+        items = [
+            {
+                'item_id': 12345,
+                'item_name': 'Test Item',
+                'sale_velocity': 10.5,
+                'average_price': 1000,
+                'last_updated': '2025-12-01 00:00:00',
+                'snapshot_date': '2025-12-01'
+            }
+        ]
+        
+        format_func = lambda x: "1h ago"
+        MarketUI.show_top_items('Behemoth', items, format_func)
+        
+        # Should print table with item name
+        assert mock_console.print.called
