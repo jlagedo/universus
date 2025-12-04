@@ -243,7 +243,7 @@ class TestUniversusGUIDataLoading:
     @pytest.mark.asyncio
     async def test_load_datacenters_success(self, gui_instance):
         """Test successful datacenter loading."""
-        gui_instance.api.get_worlds_async = AsyncMock(return_value=[
+        gui_instance.service.get_available_worlds_async = AsyncMock(return_value=[
             {'id': 73, 'name': 'Adamantoise'},
             {'id': 79, 'name': 'Cactuar'}
         ])
@@ -251,11 +251,7 @@ class TestUniversusGUIDataLoading:
             {'name': 'Aether', 'region': 'NA', 'worlds': [73, 79]}
         ]
         gui_instance.service.list_tracked_worlds.return_value = []
-        
-        # Mock session response for API check
-        mock_response = Mock()
-        mock_response.raise_for_status = Mock()
-        gui_instance.api.session.get.return_value = mock_response
+        gui_instance.service.ensure_api_connection.return_value = True
         
         await gui_instance.load_datacenters()
         
@@ -267,7 +263,7 @@ class TestUniversusGUIDataLoading:
     @pytest.mark.asyncio
     async def test_load_datacenters_error_handling(self, gui_instance):
         """Test datacenter loading error handling."""
-        gui_instance.api.get_worlds_async = AsyncMock(side_effect=Exception("API Error"))
+        gui_instance.service.ensure_api_connection.side_effect = Exception("API Error")
         
         with patch('gui.app.ui') as mock_ui, patch('gui.app.logger'):
             await gui_instance.load_datacenters()
@@ -303,13 +299,13 @@ class TestUniversusGUINavigation:
         gui_instance.main_content.__enter__ = MagicMock(return_value=gui_instance.main_content)
         gui_instance.main_content.__exit__ = MagicMock(return_value=False)
         
-        # Mock the db methods for new dashboard
-        gui_instance.db.get_tracked_worlds_count = Mock(return_value=5)
-        gui_instance.db.get_current_prices_count = Mock(return_value=100)
-        gui_instance.db.get_latest_current_price_timestamp = Mock(return_value='2025-12-02 10:00:00')
-        gui_instance.db.get_marketable_items_count = Mock(return_value=2000)
-        gui_instance.db.get_datacenter_gil_volume = Mock(return_value={'hq_volume': 0, 'nq_volume': 0, 'total_volume': 0, 'item_count': 0})
-        gui_instance.db.get_top_items_by_hq_velocity = Mock(return_value=[])
+        # Mock the service methods for new dashboard
+        gui_instance.service.get_tracked_worlds_count = Mock(return_value=5)
+        gui_instance.service.get_current_prices_count = Mock(return_value=100)
+        gui_instance.service.get_latest_current_price_timestamp = Mock(return_value='2025-12-02 10:00:00')
+        gui_instance.service.get_marketable_items_count = Mock(return_value=2000)
+        gui_instance.service.get_datacenter_gil_volume = Mock(return_value={'hq_volume': 0, 'nq_volume': 0, 'total_volume': 0, 'item_count': 0})
+        gui_instance.service.get_top_items_by_hq_velocity = Mock(return_value=[])
         
         with patch('gui.app.ui'), patch('gui.views.dashboard.ui'):
             gui_instance.change_datacenter('Primal')
@@ -323,13 +319,13 @@ class TestUniversusGUINavigation:
         gui_instance.main_content.__enter__ = MagicMock(return_value=gui_instance.main_content)
         gui_instance.main_content.__exit__ = MagicMock(return_value=False)
         
-        # Mock the db methods for new dashboard
-        gui_instance.db.get_tracked_worlds_count = Mock(return_value=5)
-        gui_instance.db.get_current_prices_count = Mock(return_value=100)
-        gui_instance.db.get_latest_current_price_timestamp = Mock(return_value='2025-12-02 10:00:00')
-        gui_instance.db.get_marketable_items_count = Mock(return_value=2000)
-        gui_instance.db.get_datacenter_gil_volume = Mock(return_value={'hq_volume': 0, 'nq_volume': 0, 'total_volume': 0, 'item_count': 0})
-        gui_instance.db.get_top_items_by_hq_velocity = Mock(return_value=[])
+        # Mock the service methods for new dashboard
+        gui_instance.service.get_tracked_worlds_count = Mock(return_value=5)
+        gui_instance.service.get_current_prices_count = Mock(return_value=100)
+        gui_instance.service.get_latest_current_price_timestamp = Mock(return_value='2025-12-02 10:00:00')
+        gui_instance.service.get_marketable_items_count = Mock(return_value=2000)
+        gui_instance.service.get_datacenter_gil_volume = Mock(return_value={'hq_volume': 0, 'nq_volume': 0, 'total_volume': 0, 'item_count': 0})
+        gui_instance.service.get_top_items_by_hq_velocity = Mock(return_value=[])
         
         with patch('gui.app.ui'), patch('gui.views.dashboard.ui'):
             gui_instance.change_world('Cactuar')

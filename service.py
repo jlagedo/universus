@@ -4,7 +4,7 @@ Business logic layer for market data operations.
 
 import logging
 import asyncio
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Optional, Any
 from datetime import datetime
 
 import requests
@@ -70,6 +70,24 @@ class MarketService:
         worlds = self.api.get_worlds()
         self.db.save_worlds_cache(worlds)
         return worlds
+    
+    async def get_available_worlds_async(self, use_cache: bool = True, max_age_hours: int = 24) -> List[Dict]:
+        """Async version: Fetch and return all available worlds.
+        
+        Non-blocking version that runs in executor.
+        
+        Args:
+            use_cache: Whether to use cached data (default True)
+            max_age_hours: Maximum age of cache in hours (default 24)
+            
+        Returns:
+            List of world dictionaries with 'id' and 'name' keys
+        """
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(
+            executor,
+            lambda: self.get_available_worlds(use_cache, max_age_hours)
+        )
     
     def refresh_cache(self) -> Dict[str, int]:
         """Manually refresh all caches.
@@ -448,3 +466,274 @@ class MarketService:
                 self.db.save_aggregated_prices(world_id, results)
                 total_updated += len(results)
         return {"worlds": len(tracked_worlds), "items": len(item_ids), "updated": total_updated, "skipped": total_skipped}
+
+    # -------------------------------------------------------------------------
+    # Dashboard / Statistics Methods (GUI Layer Support)
+    # -------------------------------------------------------------------------
+    
+    def get_tracked_worlds_count(self) -> int:
+        """Get the count of tracked worlds.
+        
+        Returns:
+            Number of tracked worlds
+        """
+        return self.db.get_tracked_worlds_count()
+    
+    def get_current_prices_count(self, world_id: int = None) -> int:
+        """Get the count of current price entries.
+        
+        Args:
+            world_id: Optional world ID to filter by
+            
+        Returns:
+            Number of current price entries
+        """
+        return self.db.get_current_prices_count(world_id)
+    
+    def get_latest_current_price_timestamp(self, world_id: int = None) -> str:
+        """Get the latest current price timestamp.
+        
+        Args:
+            world_id: Optional world ID to filter by
+            
+        Returns:
+            Timestamp string or None
+        """
+        return self.db.get_latest_current_price_timestamp(world_id)
+    
+    def get_marketable_items_count(self) -> int:
+        """Get the count of marketable items.
+        
+        Returns:
+            Number of marketable items
+        """
+        return self.db.get_marketable_items_count()
+    
+    def get_items_count(self) -> int:
+        """Get the count of items in the database.
+        
+        Returns:
+            Number of items
+        """
+        return self.db.get_items_count()
+    
+    def get_datacenter_gil_volume(self, world_id: int) -> Dict[str, Any]:
+        """Get HQ/NQ/Total gil volume for a world.
+        
+        Args:
+            world_id: World ID
+            
+        Returns:
+            Dict with hq_volume, nq_volume, total_volume keys
+        """
+        return self.db.get_datacenter_gil_volume(world_id)
+    
+    def get_top_items_by_hq_velocity(self, world_id: int, limit: int = 10) -> List[Dict]:
+        """Get top items by HQ velocity.
+        
+        Args:
+            world_id: World ID
+            limit: Number of items to return
+            
+        Returns:
+            List of item dicts with velocity and price data
+        """
+        return self.db.get_top_items_by_hq_velocity(world_id, limit)
+    
+    def get_item_name(self, item_id: int) -> Optional[str]:
+        """Get item name by ID.
+        
+        Args:
+            item_id: Item ID
+            
+        Returns:
+            Item name or None
+        """
+        return self.db.get_item_name(item_id)
+    
+    def get_sell_volume_report(self, world_id: int, limit: int = 100) -> List[Dict]:
+        """Get top items by HQ sales velocity for a tracked world.
+        
+        Args:
+            world_id: Tracked world ID
+            limit: Number of items to return
+            
+        Returns:
+            List of item dicts with price and velocity data
+        """
+        cursor = self.db.conn.cursor()
+        cursor.execute("""
+            SELECT 
+                i.name,
+                cp.hq_world_recent_price,
+                cp.hq_world_avg_price,
+                cp.hq_world_min_price,
+                cp.hq_world_daily_velocity
+            FROM marketable_items mi
+            INNER JOIN items i ON mi.item_id = i.item_id
+            INNER JOIN current_prices cp ON cp.item_id = i.item_id
+            WHERE cp.tracked_world_id = ?
+            ORDER BY cp.hq_world_daily_velocity DESC
+            LIMIT ?
+        """, (world_id, limit))
+        
+        results = []
+        for row in cursor.fetchall():
+            recent_price = row[1] or 0
+            avg_price = row[2] or 0
+            min_price = row[3] or 0
+            velocity = row[4] or 0
+            price_for_volume = recent_price or avg_price or min_price
+            gil_volume = velocity * price_for_volume
+            
+            results.append({
+                'item_name': row[0] or 'Unknown',
+                'hq_recent_price': row[1],
+                'hq_avg_price': row[2],
+                'hq_min_price': row[3],
+                'hq_velocity': row[4],
+                'gil_volume': gil_volume
+            })
+        
+        return results
+    
+    def get_sell_volume_chart_data(self, world_id: int, limit: int = 200) -> List[Dict]:
+        """Get data for sell volume chart.
+        
+        Args:
+            world_id: Tracked world ID
+            limit: Number of items to fetch for processing
+            
+        Returns:
+            List of top 10 items by gil volume with name, gil_volume, velocity, price
+        """
+        cursor = self.db.conn.cursor()
+        cursor.execute("""
+            SELECT 
+                i.name,
+                cp.hq_world_recent_price,
+                cp.hq_world_avg_price,
+                cp.hq_world_min_price,
+                cp.hq_world_daily_velocity
+            FROM marketable_items mi
+            INNER JOIN items i ON mi.item_id = i.item_id
+            INNER JOIN current_prices cp ON cp.item_id = i.item_id
+            WHERE cp.tracked_world_id = ?
+            ORDER BY cp.hq_world_daily_velocity DESC
+            LIMIT ?
+        """, (world_id, limit))
+        
+        data_points = []
+        for row in cursor.fetchall():
+            name = row[0] or 'Unknown'
+            recent = row[1] or 0
+            avg_p = row[2] or 0
+            min_p = row[3] or 0
+            velocity = row[4] or 0
+            price_for_volume = recent or avg_p or min_p
+            gil_volume = velocity * price_for_volume
+            if gil_volume > 0:
+                data_points.append({
+                    'name': name,
+                    'gil_volume': gil_volume,
+                    'velocity': velocity,
+                    'price': price_for_volume
+                })
+        
+        # Sort and return top 10
+        data_points.sort(key=lambda x: x['gil_volume'], reverse=True)
+        return data_points[:10]
+    
+    def get_market_analysis_data(self, world_id: int, search_term: str = None) -> Tuple[List[Dict], str]:
+        """Get market analysis data for a world.
+        
+        Args:
+            world_id: Tracked world ID
+            search_term: Optional item name search term
+            
+        Returns:
+            Tuple of (list of item analysis dicts, latest fetch date string)
+        """
+        cursor = self.db.conn.cursor()
+        
+        base_query = """
+            SELECT 
+                i.item_id,
+                i.name,
+                (COALESCE(cp.hq_world_daily_velocity, 0) * COALESCE(cp.hq_world_min_price, 0)) 
+                    + (COALESCE(cp.nq_world_daily_velocity, 0) * COALESCE(cp.nq_world_min_price, 0)) AS total_volume_min_price,
+                COALESCE(cp.hq_world_daily_velocity, 0) + COALESCE(cp.nq_world_daily_velocity, 0) AS total_velocity,
+                COALESCE(cp.hq_world_daily_velocity, 0) AS hq_world_daily_velocity,
+                COALESCE(cp.hq_world_min_price, 0) AS hq_world_min_price,
+                COALESCE(cp.nq_world_daily_velocity, 0) AS nq_world_daily_velocity,
+                COALESCE(cp.nq_world_min_price, 0) AS nq_world_min_price
+            FROM current_prices cp
+            INNER JOIN items i ON i.item_id = cp.item_id
+            WHERE cp.tracked_world_id = ?
+            AND strftime('%Y-%m-%d', cp.fetched_at) = (
+                SELECT strftime('%Y-%m-%d', MAX(fetched_at)) 
+                FROM current_prices 
+                WHERE tracked_world_id = ?
+            )
+        """
+        
+        params = [world_id, world_id]
+        
+        if search_term and search_term.strip():
+            base_query += " AND i.name LIKE ?"
+            params.append(f"%{search_term.strip()}%")
+        
+        base_query += " ORDER BY total_velocity DESC"
+        
+        cursor.execute(base_query, params)
+        rows = cursor.fetchall()
+        
+        results = []
+        for row in rows:
+            results.append({
+                'item_id': row[0],
+                'item_name': row[1] or 'Unknown',
+                'total_volume': row[2] or 0,
+                'total_velocity': row[3] or 0,
+                'hq_velocity': row[4] or 0,
+                'hq_min_price': row[5] or 0,
+                'nq_velocity': row[6] or 0,
+                'nq_min_price': row[7] or 0
+            })
+        
+        # Get latest fetch date
+        cursor.execute("""
+            SELECT strftime('%Y-%m-%d %H:%M', MAX(fetched_at)) as latest
+            FROM current_prices WHERE tracked_world_id = ?
+        """, (world_id,))
+        latest_row = cursor.fetchone()
+        latest_date = latest_row[0] if latest_row else 'Unknown'
+        
+        return results, latest_date
+    
+    def ensure_api_connection(self) -> bool:
+        """Ensure API client has a fresh connection.
+        
+        Returns:
+            True if connection is valid, False if reinitialized
+        """
+        try:
+            test_response = self.api.session.get(
+                f"{self.api.base_url}/data-centers", 
+                timeout=2
+            )
+            test_response.raise_for_status()
+            logger.debug("API connection verified")
+            return True
+        except Exception as e:
+            logger.warning(f"API connection lost, reinitializing: {e}")
+            if self.api:
+                try:
+                    self.api.close()
+                except Exception as close_error:
+                    logger.debug(f"Error closing API client: {close_error}")
+            # Recreate API
+            from api_client import UniversalisAPI
+            self.api = UniversalisAPI()
+            logger.info("API client reinitialized")
+            return False

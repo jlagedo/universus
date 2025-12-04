@@ -10,13 +10,12 @@ from config import get_config
 config = get_config()
 
 
-def render_item_report(state, service, db, dark_mode: bool = False):
+def render_item_report(state, service, dark_mode: bool = False):
     """Render item report view.
     
     Args:
         state: Application state
         service: Market service instance
-        db: Database instance
         dark_mode: Whether dark mode is active
     
     Returns:
@@ -45,13 +44,12 @@ def render_item_report(state, service, db, dark_mode: bool = False):
     return item_id_input, days_input, report_container
 
 
-def generate_item_report(state, service, db, item_id, days, container, set_status):
+def generate_item_report(state, service, item_id, days, container, set_status):
     """Generate item report.
     
     Args:
         state: Application state
         service: Market service instance
-        db: Database instance
         item_id: Item ID to report on
         days: Number of days of history
         container: UI container
@@ -68,7 +66,7 @@ def generate_item_report(state, service, db, item_id, days, container, set_statu
                 ui.label(f'No data available for item {item_id} on {state.selected_world}').classes('text-yellow-600')
                 return
             
-            item_name = db.get_item_name(item_id) or f"Item #{item_id}"
+            item_name = service.get_item_name(item_id) or f"Item #{item_id}"
             ui.label(f'{item_name}').classes('text-xl font-bold')
             ui.label(f'{state.selected_world} • {len(snapshots)} days of data').classes('text-gray-500 mb-4')
             
@@ -119,13 +117,12 @@ def generate_item_report(state, service, db, item_id, days, container, set_statu
         ui.notify(f'Error: {e}', type='negative')
 
 
-def render_sell_volume(state, service, db, dark_mode: bool = False):
+def render_sell_volume(state, service, dark_mode: bool = False):
     """Render sell volume by world report.
     
     Args:
         state: Application state
         service: Market service instance
-        db: Database instance
         dark_mode: Whether dark mode is active
     
     Returns:
@@ -163,12 +160,12 @@ def render_sell_volume(state, service, db, dark_mode: bool = False):
     return world_options, world_select, limit_input, report_container
 
 
-def generate_sell_volume_report(state, db, world_options, world_name, limit, container, set_status):
+def generate_sell_volume_report(state, service, world_options, world_name, limit, container, set_status):
     """Generate sell volume report.
     
     Args:
         state: Application state
-        db: Database instance
+        service: Market service instance
         world_options: World name to ID mapping
         world_name: Selected world name
         limit: Number of items to show
@@ -184,23 +181,7 @@ def generate_sell_volume_report(state, db, world_options, world_name, limit, con
     set_status(f'Generating report for {world_name}...')
     
     try:
-        cursor = db.conn.cursor()
-        cursor.execute("""
-            SELECT 
-                i.name,
-                cp.hq_world_recent_price,
-                cp.hq_world_avg_price,
-                cp.hq_world_min_price,
-                cp.hq_world_daily_velocity
-            FROM marketable_items mi
-            INNER JOIN items i ON mi.item_id = i.item_id
-            INNER JOIN current_prices cp ON cp.item_id = i.item_id
-            WHERE cp.tracked_world_id = ?
-            ORDER BY cp.hq_world_daily_velocity DESC
-            LIMIT ?
-        """, (wid, limit))
-        
-        results = cursor.fetchall()
+        results = service.get_sell_volume_report(wid, limit)
         
         with container:
             if not results:
@@ -220,21 +201,15 @@ def generate_sell_volume_report(state, db, world_options, world_name, limit, con
             ]
             
             rows = []
-            for idx, row in enumerate(results, start=1):
-                recent_price = row[1] or 0
-                avg_price = row[2] or 0
-                min_price = row[3] or 0
-                velocity = row[4] or 0
-                price_for_volume = recent_price or avg_price or min_price
-                gil_volume = velocity * price_for_volume
+            for idx, item in enumerate(results, start=1):
                 rows.append({
                     'rank': idx,
-                    'item_name': row[0] or 'Unknown',
-                    'hq_velocity': format_velocity(row[4]),
-                    'hq_recent_price': format_gil(row[1]),
-                    'hq_avg_price': format_gil(row[2]),
-                    'hq_min_price': format_gil(row[3]),
-                    'gil_volume': format_gil(gil_volume),
+                    'item_name': item['item_name'],
+                    'hq_velocity': format_velocity(item['hq_velocity']),
+                    'hq_recent_price': format_gil(item['hq_recent_price']),
+                    'hq_avg_price': format_gil(item['hq_avg_price']),
+                    'hq_min_price': format_gil(item['hq_min_price']),
+                    'gil_volume': format_gil(item['gil_volume']),
                 })
             
             ui.table(columns=columns, rows=rows, row_key='rank', pagination={'rowsPerPage': 20}).classes('w-full')
@@ -249,13 +224,12 @@ def generate_sell_volume_report(state, db, world_options, world_name, limit, con
         ui.notify(f'Error: {e}', type='negative')
 
 
-def render_sell_volume_chart(state, service, db, dark_mode: bool = False):
+def render_sell_volume_chart(state, service, dark_mode: bool = False):
     """Render sell volume chart view.
     
     Args:
         state: Application state
         service: Market service instance
-        db: Database instance
         dark_mode: Whether dark mode is active
     
     Returns:
@@ -287,12 +261,12 @@ def render_sell_volume_chart(state, service, db, dark_mode: bool = False):
     return world_options, world_select, chart_container
 
 
-def generate_chart(state, db, world_options, world_name, container, set_status):
+def generate_chart(state, service, world_options, world_name, container, set_status):
     """Generate sell volume chart.
     
     Args:
         state: Application state
-        db: Database instance
+        service: Market service instance
         world_options: World name to ID mapping
         world_name: Selected world name
         container: UI container
@@ -307,51 +281,21 @@ def generate_chart(state, db, world_options, world_name, container, set_status):
     set_status(f'Building chart for {world_name}...')
     
     try:
-        cursor = db.conn.cursor()
-        cursor.execute("""
-            SELECT 
-                i.name,
-                cp.hq_world_recent_price,
-                cp.hq_world_avg_price,
-                cp.hq_world_min_price,
-                cp.hq_world_daily_velocity
-            FROM marketable_items mi
-            INNER JOIN items i ON mi.item_id = i.item_id
-            INNER JOIN current_prices cp ON cp.item_id = i.item_id
-            WHERE cp.tracked_world_id = ?
-            ORDER BY cp.hq_world_daily_velocity DESC
-            LIMIT 200
-        """, (wid,))
-        rows = cursor.fetchall()
+        data_points = service.get_sell_volume_chart_data(wid)
         
-        data_points = []
-        for row in rows:
-            name = row[0] or 'Unknown'
-            recent = row[1] or 0
-            avg_p = row[2] or 0
-            min_p = row[3] or 0
-            velocity = row[4] or 0
-            price_for_volume = recent or avg_p or min_p
-            gil_volume = velocity * price_for_volume
-            if gil_volume > 0:
-                data_points.append((name, gil_volume, velocity, price_for_volume))
-        
-        data_points.sort(key=lambda x: x[1], reverse=True)
-        top10 = data_points[:10]
-        
-        if not top10:
+        if not data_points:
             with container:
                 ui.label('No data available. Run price update first.').classes('text-yellow-600')
             set_status('Ready')
             return
         
-        total_volume = sum(gv for _, gv, _, _ in top10)
+        total_volume = sum(item['gil_volume'] for item in data_points)
         
         with container:
             ui.label(f'Top 10 Gil Volume Items on {world_name} (Total {format_gil(total_volume)} gil)').classes('text-lg font-semibold mb-2')
             
-            labels = [d[0] for d in top10]
-            values = [d[1] for d in top10]
+            labels = [item['name'] for item in data_points]
+            values = [item['gil_volume'] for item in data_points]
             
             # Fallback: display proportional bar list
             total = sum(values) or 1
@@ -379,11 +323,11 @@ def generate_chart(state, db, world_options, world_name, container, set_status):
                 rows=[
                     {
                         'rank': idx + 1,
-                        'item': name,
-                        'gil_volume': format_gil(gv),
-                        'velocity': format_velocity(vel)
+                        'item': item['name'],
+                        'gil_volume': format_gil(item['gil_volume']),
+                        'velocity': format_velocity(item['velocity'])
                     }
-                    for idx, (name, gv, vel, price) in enumerate(top10)
+                    for idx, item in enumerate(data_points)
                 ],
                 row_key='rank'
             ).classes('w-full mt-4')

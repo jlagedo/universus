@@ -8,11 +8,11 @@ from ..components.cards import progress_card, warning_card, success_card
 from ..utils.icons import GameIcons
 
 
-def render_import_static_data(db, dark_mode: bool = False):
+def render_import_static_data(service, dark_mode: bool = False):
     """Render import static data view.
     
     Args:
-        db: Database instance
+        service: Market service instance
         dark_mode: Whether dark mode is active
     
     Returns:
@@ -21,8 +21,8 @@ def render_import_static_data(db, dark_mode: bool = False):
     ui.label('Import Static Data').classes('text-2xl font-bold mb-4')
     ui.label('Download item names and marketable items data.').classes('text-gray-500 mb-4')
     
-    items_count = db.get_items_count()
-    marketable_count = db.get_marketable_items_count()
+    items_count = service.get_items_count()
+    marketable_count = service.get_marketable_items_count()
     
     with ui.card().classes('w-full max-w-xl'):
         ui.label('Static Data').classes('text-lg font-semibold mb-2')

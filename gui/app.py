@@ -53,7 +53,7 @@ class UniversusGUI:
     async def load_datacenters(self):
         """Load datacenters and worlds from API."""
         try:
-            self._ensure_api_connection()
+            self.service.ensure_api_connection()
             
             # Load tracked worlds first
             tracked_worlds = self.service.list_tracked_worlds()
@@ -61,7 +61,7 @@ class UniversusGUI:
             self.state.set_tracked_worlds(tracked_world_ids)
             
             # Fetch worlds to build ID-to-name mapping
-            worlds_data = await self.api.get_worlds_async()
+            worlds_data = await self.service.get_available_worlds_async()
             world_id_to_name = {w['id']: w['name'] for w in worlds_data}
             
             # Fetch datacenters
@@ -83,26 +83,6 @@ class UniversusGUI:
         except Exception as e:
             logger.error(f"Failed to load datacenters: {e}")
             ui.notify(f"Failed to load datacenters: {e}", type='negative')
-    
-    def _ensure_api_connection(self):
-        """Ensure API client has a fresh connection."""
-        try:
-            test_response = self.api.session.get(f"{self.api.base_url}/data-centers", timeout=2)
-            test_response.raise_for_status()
-            logger.debug("API connection verified")
-        except Exception as e:
-            logger.warning(f"API connection lost, reinitializing: {e}")
-            if self.api:
-                try:
-                    self.api.close()
-                except Exception as close_error:
-                    logger.debug(f"Error closing API client: {close_error}")
-            # Recreate API and service
-            from api_client import UniversalisAPI
-            from service import MarketService
-            self.api = UniversalisAPI()
-            self.service = MarketService(self.db, self.api)
-            logger.info("API client reinitialized")
     
     def set_status(self, message: str):
         """Update status bar message."""
@@ -206,11 +186,11 @@ class UniversusGUI:
     # View rendering methods
     def _render_dashboard(self):
         """Render dashboard view."""
-        dashboard.render(self.state, self.db, self.theme.dark_mode)
+        dashboard.render(self.state, self.service, self.theme.dark_mode)
     
     def _render_datacenters(self):
         """Render datacenters view."""
-        datacenters.render(self.state, self.service, self.api, self.theme.dark_mode)
+        datacenters.render(self.state, self.service, self.theme.dark_mode)
     
     def _render_top_items(self):
         """Render top items view."""
@@ -222,7 +202,7 @@ class UniversusGUI:
             async def fetch_top():
                 self.set_status(f'Fetching top {int(limit_input.value)} items...')
                 try:
-                    self._ensure_api_connection()
+                    self.service.ensure_api_connection()
                     items = self.service.get_top_items(self.state.selected_world, int(limit_input.value))
                     top_items.render_table(items, results_container)
                     self.set_status('Ready')
@@ -235,7 +215,7 @@ class UniversusGUI:
     def _render_report(self):
         """Render item report view."""
         item_id_input, days_input, report_container = reports.render_item_report(
-            self.state, self.service, self.db, self.theme.dark_mode
+            self.state, self.service, self.theme.dark_mode
         )
         
         if item_id_input and days_input and report_container:
@@ -247,9 +227,9 @@ class UniversusGUI:
                     ui.notify('Please enter a valid Item ID', type='warning')
                     return
                 
-                self._ensure_api_connection()
+                self.service.ensure_api_connection()
                 reports.generate_item_report(
-                    self.state, self.service, self.db, item_id, days,
+                    self.state, self.service, item_id, days,
                     report_container, self.set_status
                 )
             
@@ -257,10 +237,10 @@ class UniversusGUI:
     
     def _render_import_static_data(self):
         """Render import static data view."""
-        progress_container = settings.render_import_static_data(self.db, self.theme.dark_mode)
+        progress_container = settings.render_import_static_data(self.service, self.theme.dark_mode)
         
         async def start_import():
-            self._ensure_api_connection()
+            self.service.ensure_api_connection()
             await settings.execute_import_static_data(
                 self.service, progress_container, self.set_status
             )
@@ -291,13 +271,13 @@ class UniversusGUI:
     def _render_sell_volume(self):
         """Render sell volume by world view."""
         world_options, world_select, limit_input, report_container = reports.render_sell_volume(
-            self.state, self.service, self.db, self.theme.dark_mode
+            self.state, self.service, self.theme.dark_mode
         )
         
         if world_options and world_select and limit_input and report_container:
             def generate():
                 reports.generate_sell_volume_report(
-                    self.state, self.db, world_options, world_select.value,
+                    self.state, self.service, world_options, world_select.value,
                     int(limit_input.value), report_container, self.set_status
                 )
             
@@ -306,13 +286,13 @@ class UniversusGUI:
     def _render_sell_volume_chart(self):
         """Render sell volume chart view."""
         world_options, world_select, chart_container = reports.render_sell_volume_chart(
-            self.state, self.service, self.db, self.theme.dark_mode
+            self.state, self.service, self.theme.dark_mode
         )
         
         if world_options and world_select and chart_container:
             def generate():
                 reports.generate_chart(
-                    self.state, self.db, world_options, world_select.value,
+                    self.state, self.service, world_options, world_select.value,
                     chart_container, self.set_status
                 )
             
@@ -321,14 +301,14 @@ class UniversusGUI:
     def _render_market_analysis(self):
         """Render market analysis view."""
         world_options, world_select, search_input, results_container = market_analysis.render(
-            self.state, self.service, self.db, self.theme.dark_mode
+            self.state, self.service, self.theme.dark_mode
         )
         
         if world_options and world_select and results_container:
             def generate():
                 search_term = search_input.value if search_input else ''
                 market_analysis.generate_analysis(
-                    self.state, self.db, world_options, world_select.value,
+                    self.state, self.service, world_options, world_select.value,
                     search_term, results_container, self.set_status
                 )
             

@@ -6,13 +6,12 @@ from nicegui import ui
 from ..utils.formatters import format_gil, format_velocity
 
 
-def render(state, service, db, dark_mode: bool = False):
+def render(state, service, dark_mode: bool = False):
     """Render market analysis view.
     
     Args:
         state: Application state
         service: Market service instance
-        db: Database instance
         dark_mode: Whether dark mode is active
     
     Returns:
@@ -56,12 +55,12 @@ def render(state, service, db, dark_mode: bool = False):
     return world_options, world_select, search_input, results_container
 
 
-def generate_analysis(state, db, world_options, world_name, search_term, container, set_status):
+def generate_analysis(state, service, world_options, world_name, search_term, container, set_status):
     """Generate market analysis report.
     
     Args:
         state: Application state
-        db: Database instance
+        service: Market service instance
         world_options: World name to ID mapping
         world_name: Selected world name
         search_term: Item name search term (partial match)
@@ -77,44 +76,7 @@ def generate_analysis(state, db, world_options, world_name, search_term, contain
     set_status(f'Generating analysis for {world_name}...')
     
     try:
-        cursor = db.conn.cursor()
-        
-        # Build query with optional search filter
-        # Only fetch latest data (same day as most recent fetched_at)
-        base_query = """
-            SELECT 
-                i.item_id,
-                i.name,
-                (COALESCE(cp.hq_world_daily_velocity, 0) * COALESCE(cp.hq_world_min_price, 0)) 
-                    + (COALESCE(cp.nq_world_daily_velocity, 0) * COALESCE(cp.nq_world_min_price, 0)) AS total_volume_min_price,
-                COALESCE(cp.hq_world_daily_velocity, 0) + COALESCE(cp.nq_world_daily_velocity, 0) AS total_velocity,
-                COALESCE(cp.hq_world_daily_velocity, 0) AS hq_world_daily_velocity,
-                COALESCE(cp.hq_world_min_price, 0) AS hq_world_min_price,
-                COALESCE(cp.nq_world_daily_velocity, 0) AS nq_world_daily_velocity,
-                COALESCE(cp.nq_world_min_price, 0) AS nq_world_min_price
-            FROM current_prices cp
-            INNER JOIN items i ON i.item_id = cp.item_id
-            WHERE cp.tracked_world_id = ?
-            AND strftime('%Y-%m-%d', cp.fetched_at) = (
-                SELECT strftime('%Y-%m-%d', MAX(fetched_at)) 
-                FROM current_prices 
-                WHERE tracked_world_id = ?
-            )
-        """
-        
-        params = [wid, wid]
-        
-        if search_term and search_term.strip():
-            base_query += " AND i.name LIKE ?"
-            params.append(f"%{search_term.strip()}%")
-        
-        # Order by total velocity descending
-        base_query += """
-            ORDER BY total_velocity DESC
-        """
-        
-        cursor.execute(base_query, params)
-        results = cursor.fetchall()
+        results, latest_date = service.get_market_analysis_data(wid, search_term)
         
         with container:
             if not results:
@@ -125,20 +87,10 @@ def generate_analysis(state, db, world_options, world_name, search_term, contain
                 ui.label(msg).classes('text-yellow-600')
                 return
             
-            # Get latest fetch date for display
-            cursor.execute("""
-                SELECT strftime('%Y-%m-%d %H:%M', MAX(fetched_at)) as latest
-                FROM current_prices WHERE tracked_world_id = ?
-            """, (wid,))
-            latest_row = cursor.fetchone()
-            latest_date = latest_row[0] if latest_row else 'Unknown'
-            
             search_info = f' • Filtered by "{search_term}"' if search_term and search_term.strip() else ''
             ui.label(f'{world_name} Market Analysis • Data from {latest_date}{search_info}').classes('text-lg font-semibold mb-2')
             
             # Define columns for the table
-            # We store both raw values (for sorting) and formatted values (for display)
-            # The ':' syntax in field allows accessing nested/formatted values
             columns = [
                 {'name': 'rank', 'label': '#', 'field': 'rank', 'sortable': True, 'align': 'center'},
                 {'name': 'item_name', 'label': 'Item Name', 'field': 'item_name', 'sortable': True, 'align': 'left'},
@@ -151,34 +103,25 @@ def generate_analysis(state, db, world_options, world_name, search_term, contain
             ]
             
             rows = []
-            for idx, row in enumerate(results, start=1):
-                # Store raw numeric values - sorting will work on these
-                total_volume_val = row[2] or 0
-                total_velocity_val = row[3] or 0
-                hq_velocity_val = row[4] or 0
-                hq_min_price_val = row[5] or 0
-                nq_velocity_val = row[6] or 0
-                nq_min_price_val = row[7] or 0
-                
+            for idx, item in enumerate(results, start=1):
                 rows.append({
                     'rank': idx,
-                    'item_id': row[0],
-                    'item_name': row[1] or 'Unknown',
+                    'item_id': item['item_id'],
+                    'item_name': item['item_name'],
                     # Use raw numeric values - table will sort correctly
-                    # Format display using slot template below
-                    'total_volume': total_volume_val,
-                    'total_velocity': total_velocity_val,
-                    'hq_velocity': hq_velocity_val,
-                    'hq_min_price': hq_min_price_val,
-                    'nq_velocity': nq_velocity_val,
-                    'nq_min_price': nq_min_price_val,
+                    'total_volume': item['total_volume'],
+                    'total_velocity': item['total_velocity'],
+                    'hq_velocity': item['hq_velocity'],
+                    'hq_min_price': item['hq_min_price'],
+                    'nq_velocity': item['nq_velocity'],
+                    'nq_min_price': item['nq_min_price'],
                     # Formatted values for display
-                    'total_volume_fmt': format_gil(total_volume_val),
-                    'total_velocity_fmt': format_velocity(total_velocity_val),
-                    'hq_velocity_fmt': format_velocity(hq_velocity_val),
-                    'hq_min_price_fmt': format_gil(hq_min_price_val),
-                    'nq_velocity_fmt': format_velocity(nq_velocity_val),
-                    'nq_min_price_fmt': format_gil(nq_min_price_val),
+                    'total_volume_fmt': format_gil(item['total_volume']),
+                    'total_velocity_fmt': format_velocity(item['total_velocity']),
+                    'hq_velocity_fmt': format_velocity(item['hq_velocity']),
+                    'hq_min_price_fmt': format_gil(item['hq_min_price']),
+                    'nq_velocity_fmt': format_velocity(item['nq_velocity']),
+                    'nq_min_price_fmt': format_gil(item['nq_min_price']),
                 })
             
             # Create table with pagination and sorting - full width

@@ -29,12 +29,12 @@ def format_decimal(num, decimals=2):
     return f'{num:,.{decimals}f}'
 
 
-def render(state, db, dark_mode: bool = False):
+def render(state, service, dark_mode: bool = False):
     """Render the dashboard view.
     
     Args:
         state: Application state
-        db: Database instance
+        service: Market service instance
         dark_mode: Whether dark mode is active
     """
     title_class = 'text-2xl font-bold mb-4 text-gray-900' if not dark_mode else 'text-2xl font-bold mb-4 text-white'
@@ -55,28 +55,28 @@ def render(state, db, dark_mode: bool = False):
     # Stats cards - NEW TRACKERS
     with ui.row().classes('w-full gap-4 mb-6'):
         # Tracked Worlds count
-        tracked_worlds_count = db.get_tracked_worlds_count()
+        tracked_worlds_count = service.get_tracked_worlds_count()
         stat_card('Tracked Worlds', format_number(tracked_worlds_count), GameIcons.WORLD, 'blue', dark_mode)
         
         # Current Prices count (for selected world if available)
         if world_id:
-            current_prices_count = db.get_current_prices_count(world_id)
+            current_prices_count = service.get_current_prices_count(world_id)
             stat_card('Current Prices', format_number(current_prices_count), GameIcons.SCROLL, 'green', dark_mode)
         else:
-            current_prices_count = db.get_current_prices_count()
+            current_prices_count = service.get_current_prices_count()
             stat_card('Current Prices', format_number(current_prices_count), GameIcons.SCROLL, 'green', dark_mode)
         
         # Latest Price Timestamp
         if world_id:
-            latest_timestamp = db.get_latest_current_price_timestamp(world_id)
+            latest_timestamp = service.get_latest_current_price_timestamp(world_id)
         else:
-            latest_timestamp = db.get_latest_current_price_timestamp()
+            latest_timestamp = service.get_latest_current_price_timestamp()
         
         timestamp_display = format_time_ago(latest_timestamp) if latest_timestamp else 'No data'
         stat_card('Latest Update', timestamp_display, GameIcons.CLOCK, 'purple', dark_mode)
         
         # Marketable Items Database
-        marketable_count = db.get_marketable_items_count()
+        marketable_count = service.get_marketable_items_count()
         stat_card('Marketable Items', format_number(marketable_count), GameIcons.TREASURE, 'teal', dark_mode)
     
     # World-specific data section
@@ -84,7 +84,7 @@ def render(state, db, dark_mode: bool = False):
         # Datacenter Gil Volume Widget
         ui.label(f'{state.selected_world} Market Analysis').classes(actions_class + ' mt-6')
         
-        volume_data = db.get_datacenter_gil_volume(world_id)
+        volume_data = service.get_datacenter_gil_volume(world_id)
         
         with ui.row().classes('w-full gap-4 mb-6'):
             stat_card('HQ Gil Volume', format_gil(volume_data['hq_volume']), GameIcons.TRENDING, 'amber', dark_mode)
@@ -94,7 +94,7 @@ def render(state, db, dark_mode: bool = False):
         # Top 10 items by HQ velocity
         ui.label('Top 10 Items by HQ Velocity').classes(actions_class + ' mt-6')
         
-        top_items = db.get_top_items_by_hq_velocity(world_id, limit=10)
+        top_items = service.get_top_items_by_hq_velocity(world_id, limit=10)
         
         if top_items:
             columns = [
@@ -123,3 +123,4 @@ def render(state, db, dark_mode: bool = False):
         ui.label('Please select a world from the header dropdown to view market analysis.').classes(label_class)
     
     return None, None, None
+

@@ -5,13 +5,12 @@ Datacenters view.
 from nicegui import ui
 
 
-def render(state, service, api, dark_mode: bool = False):
+def render(state, service, dark_mode: bool = False):
     """Render the datacenters view.
     
     Args:
         state: Application state
         service: Market service instance
-        api: API client instance
         dark_mode: Whether dark mode is active
     
     Returns:
