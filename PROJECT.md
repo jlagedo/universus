@@ -30,19 +30,22 @@ universus/
 │   │   │   ├── header.py     # Header with selectors
 │   │   │   ├── sidebar.py    # Navigation sidebar
 │   │   │   ├── footer.py     # Status footer
-│   │   │   └── cards.py      # Stat & progress cards
+│   │   │   ├── breadcrumb.py # Breadcrumb navigation
+│   │   │   └── cards.py      # Stat, warning, filter cards
 │   │   ├── views/            # Page controllers
 │   │   │   ├── __init__.py
 │   │   │   ├── dashboard.py  # Dashboard view with market analysis
 │   │   │   ├── datacenters.py # Datacenters list
 │   │   │   ├── top_items.py  # Top items view
+│   │   │   ├── market_analysis.py # HQ/NQ volume analysis
 │   │   │   ├── reports.py    # Item reports & sell volume charts
 │   │   │   └── settings.py   # Import static data & tracked worlds
 │   │   └── utils/            # GUI utilities
 │   │       ├── __init__.py
 │   │       ├── formatters.py # Gil, velocity formatting
 │   │       ├── icons.py      # GameIcons class (Material Icons)
-│   │       └── theme.py      # Theme management
+│   │       ├── design_system.py # Unified design tokens & helpers
+│   │       └── theme.py      # Theme management & CSS injection
 │
 ├── Configuration
 │   ├── config.py             # Configuration loader
@@ -459,18 +462,51 @@ Starts web interface on http://localhost:8080
 - Real-time progress feedback
 - Responsive during operations
 - Interactive data tables with pagination
-- Dark/light theme toggle (Tokyo Night theme for dark mode)
+- **Dark mode only** (Tokyo Night inspired theme)
 - Modular component-based UI
-- Views: dashboard, datacenters, top items, item reports, sell volume, sell volume charts, settings
+- **Unified Design System** with consistent colors, typography, and spacing
+- Views: dashboard, datacenters, top items, item reports, sell volume, sell volume charts, market analysis, settings
 - Import static data (items + marketable items)
 - Tracked worlds management (add/remove worlds)
+
+### Design System
+The GUI uses a centralized design system (`gui/utils/design_system.py`) for consistent styling:
+
+**Color Palette (WCAG AA Compliant)**
+- Background: `#1E1E1E` (main), `#2A2A2A` (cards)
+- HQ Accent: `#00C8A2` (teal)
+- NQ Accent: `#FFB400` (gold)
+- Interactive: `#4DA6FF` (blue)
+- Text: `#FFFFFF` (primary), `#B0B0B0` (secondary - 8.5:1 contrast ratio)
+- Error: `#FF5555`, Warning: `#FFB400`, Success: `#00C8A2`
+
+**Typography**
+- Headings: 600-700 weight, ≥18px (Orbitron font)
+- Metrics: 500-600 weight, ≥16px (Exo 2 font)
+- Labels: 400 weight, ≥14px (Rajdhani font)
+
+**Helper Functions**
+```python
+from gui.utils.design_system import heading_classes, PROPS, TABLE_SLOTS
+from gui.components.cards import warning_card, stat_card
+
+# Consistent headings
+ui.label('Title').classes(heading_classes(2))  # h2 style
+
+# Reusable table slots
+table.add_slot('body-cell-price', TABLE_SLOTS.PRICE_CELL)
+
+# Warning messages
+warning_card('No data', 'Please configure tracked worlds first.')
+```
 
 ### Technical Implementation
 - Built with NiceGUI
 - Modular architecture with separation of concerns
-- Component-based UI (header, sidebar, footer, cards)
+- Component-based UI (header, sidebar, footer, breadcrumb, cards)
 - State management via `AppState` class
-- Theme management via `ThemeManager` class
+- **Unified Design System** via `design_system.py` module
+- Theme management via `ThemeManager` class with CSS custom properties
 - Async operations using ThreadPoolExecutor
 - Thread-safe database access
 - Automatic error handling
@@ -753,6 +789,6 @@ Contributions welcome! Please:
 
 ---
 
-**Last Updated**: December 2, 2025
+**Last Updated**: December 4, 2025
 **Status**: Production Ready
 **Version**: 1.0.0

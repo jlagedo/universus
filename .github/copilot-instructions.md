@@ -163,29 +163,54 @@ for item in items:
 
 ### Component Structure
 
-Organize GUI code into modular components:
+Organize GUI code into modular components using the design system:
 
 ```python
 # gui/components/my_component.py
 from nicegui import ui
+from ..utils.design_system import heading_classes, PROPS
 
 class MyComponent:
     """Reusable UI component."""
     
-    def __init__(self, on_action: callable, dark_mode: bool = False):
+    def __init__(self, on_action: callable):
         self.on_action = on_action
-        self.dark_mode = dark_mode
         self._build()
     
     def _build(self):
         """Build the component UI."""
-        with ui.card().classes('w-full'):
-            self.label = ui.label('Component')
-            ui.button('Action', on_click=self._handle_action)
+        with ui.card().classes('w-full p-4'):
+            ui.label('Component').classes(heading_classes(3))
+            ui.button('Action', on_click=self._handle_action).props(PROPS.BUTTON_FLAT)
     
     async def _handle_action(self):
         """Handle button click."""
         await self.on_action()
+```
+
+### Card Components
+
+Use the centralized card components from `gui/components/cards.py`:
+
+```python
+from gui.components.cards import (
+    stat_card,       # Metric display with optional HQ/NQ accent
+    warning_card,    # Yellow warning messages
+    error_card,      # Red error messages
+    info_card,       # Blue informational messages
+    success_card,    # Green success messages
+    filter_card,     # Filter/form container
+    section_card,    # Generic section container
+)
+
+# Stat card with accent color
+stat_card('Daily Velocity', '12.5/day', accent='hq')  # Teal accent
+stat_card('Min Price', '50,000 gil', accent='nq')     # Gold accent
+stat_card('Listings', '42', accent=None)              # No accent
+
+# Warning/error/info cards
+warning_card('No data available', 'Run price update first.')
+error_card('Connection failed', 'Check your internet connection.')
 ```
 
 ### Async Operations
@@ -241,24 +266,54 @@ ui.notify('Error: Connection failed', type='negative')  # Red
 ui.notify('Processing...', type='info')  # Blue
 ```
 
-### CSS Classes
+### CSS Classes and Design System
 
-Use Tailwind CSS classes for styling (built into NiceGUI):
+The GUI uses a **unified design system** (`gui/utils/design_system.py`) for consistent styling:
 
+```python
+from gui.utils.design_system import (
+    heading_classes, metric_classes, card_classes,
+    COLORS, TYPOGRAPHY, SPACING, PROPS, TABLE_SLOTS
+)
+from gui.components.cards import stat_card, warning_card, filter_card
+
+# Use heading helper for consistent typography
+ui.label('Page Title').classes(heading_classes(2))  # h2 style
+ui.label('Section').classes(heading_classes(3))    # h3 style
+
+# Use card components
+stat_card('Velocity', '12.5/day', accent='hq')  # HQ teal accent
+stat_card('Price', '50,000 gil', accent='nq')   # NQ gold accent
+warning_card('No data', 'Please select a world first.')
+
+# Use PROPS for Quasar component consistency
+ui.select(...).props(PROPS.SELECT_OUTLINED)
+ui.button(...).props(PROPS.BUTTON_FLAT)
+
+# Use TABLE_SLOTS for reusable table formatting
+table.add_slot('body-cell-price', TABLE_SLOTS.PRICE_CELL)
+table.add_slot('header-cell-velocity', TABLE_SLOTS.header_tooltip('velocity', 'Sales per day'))
+```
+
+**Color Palette** (WCAG AA Compliant):
+- Background: `#1E1E1E` (main), `#2A2A2A` (cards)
+- HQ Accent: `#00C8A2` (teal) - High Quality items
+- NQ Accent: `#FFB400` (gold) - Normal Quality items  
+- Interactive: `#4DA6FF` (blue) - Links, buttons
+- Text: `#FFFFFF` (primary), `#B0B0B0` (secondary)
+- Border: `#3A3A3A`
+
+**Typography Rules**:
+- Headings: 600-700 weight, ≥18px
+- Metrics/values: 500-600 weight, ≥16px
+- Labels: 400 weight, ≥14px
+
+**Layout with Tailwind**:
 ```python
 # Layout
 ui.card().classes('w-full p-4 mb-4')
 ui.row().classes('gap-4 items-center justify-between')
 ui.column().classes('w-full space-y-2')
-
-# Typography
-ui.label('Title').classes('text-2xl font-bold')
-ui.label('Subtitle').classes('text-gray-600')
-
-# Colors
-ui.label('Success').classes('text-green-600')
-ui.label('Warning').classes('text-yellow-600')
-ui.label('Error').classes('text-red-600')
 ```
 
 ### Icons
@@ -277,17 +332,26 @@ ui.icon(GameIcons.SUCCESS).classes('text-green-500')
 ui.button('Dashboard', icon='dashboard')  # Don't do this
 ```
 
-### Theme Support
+### Dark Mode Only
 
-Always consider dark/light mode in components:
+The application uses **dark mode only**. The `dark_mode` parameter is deprecated but kept for backward compatibility:
 
 ```python
-def render(self, dark_mode: bool = False):
-    bg_class = 'bg-gray-800' if dark_mode else 'bg-white'
-    text_class = 'text-gray-100' if dark_mode else 'text-gray-900'
+# Views receive dark_mode but can ignore it
+def render(state, service, dark_mode: bool = False):
+    """Render the view.
     
-    with ui.card().classes(f'{bg_class} {text_class}'):
-        ui.label('Content')
+    Args:
+        state: Application state
+        service: Market service instance
+        dark_mode: Ignored (always dark mode)
+    """
+    # Use design system - no conditional styling needed
+    ui.label('Title').classes(heading_classes(2))
+    
+    # Use card components with consistent styling
+    with ui.card().classes(card_classes()):
+        ui.label('Content').classes('text-white')
 ```
 
 ### State Management
@@ -316,8 +380,15 @@ Follow the established view pattern for new views:
 
 ```python
 # gui/views/my_view.py
+"""My view description.
+
+Uses the unified design system for consistent styling.
+"""
+
 from nicegui import ui
 import logging
+from ..utils.design_system import heading_classes, PROPS
+from ..components.cards import warning_card
 
 logger = logging.getLogger(__name__)
 
@@ -327,16 +398,20 @@ def render(state, service, dark_mode: bool = False):
     Args:
         state: Application state
         service: Market service instance
-        dark_mode: Whether dark mode is enabled
+        dark_mode: Ignored (always dark mode)
     """
-    with ui.card().classes('w-full'):
-        ui.label('My View').classes('text-2xl font-bold')
-        
-        # Return inputs/containers for event handlers
-        input_field = ui.input('Parameter')
-        results = ui.column()
-        
-        return input_field, results
+    ui.label('My View').classes(heading_classes(2))
+    ui.label('View description').classes('text-gray-400 mb-6')
+    
+    if not state.selected_world:
+        warning_card('No world selected', 'Please select a world first.')
+        return None, None
+    
+    with ui.card().classes('w-full p-4'):
+        input_field = ui.input('Parameter').classes('w-full')
+        results = ui.column().classes('w-full mt-4')
+    
+    return input_field, results
 
 async def fetch_data(service, params, results_container, set_status):
     """Fetch and display data."""
@@ -346,7 +421,7 @@ async def fetch_data(service, params, results_container, set_status):
         
         with results_container:
             for item in data:
-                ui.label(item['name'])
+                ui.label(item['name']).classes('text-white')
         
         set_status('Ready')
     except Exception as e:
@@ -504,7 +579,7 @@ pytest test_database.py::TestDatabase::test_insert -v
 When adding new features, place code in the appropriate module:
 
 | Feature Type | Location |
-|--------------|----------|
+|--------------|-----------|
 | CLI command | `universus.py` |
 | Business logic | `service.py` |
 | Database operations | `database.py` |
@@ -513,6 +588,8 @@ When adding new features, place code in the appropriate module:
 | GUI view | `gui/views/` |
 | GUI component | `gui/components/` |
 | GUI utilities | `gui/utils/` |
+| Design tokens/helpers | `gui/utils/design_system.py` |
+| Theme/CSS | `gui/utils/theme.py` |
 | Configuration | `config.py` |
 
 ---
@@ -653,7 +730,9 @@ When writing code for this project:
 - [ ] Protect database writes with locks
 - [ ] Never bypass rate limiting
 - [ ] Use `GameIcons` class for icons
-- [ ] Support dark/light themes
+- [ ] Use design system helpers (`heading_classes`, `PROPS`, etc.)
+- [ ] Use card components (`warning_card`, `stat_card`, etc.)
+- [ ] Follow WCAG AA contrast guidelines
 - [ ] Write tests for new functionality
 - [ ] Keep documentation updated
 
