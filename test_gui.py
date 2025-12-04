@@ -78,32 +78,23 @@ class TestFormatFunctions:
 
 
 class TestThemeManager:
-    """Test suite for ThemeManager."""
+    """Test suite for ThemeManager (dark mode only)."""
     
-    def test_initialization_light(self):
-        """Test theme manager initialization with light mode."""
-        theme = ThemeManager('light')
-        assert theme.dark_mode is False
-    
-    def test_initialization_dark(self):
-        """Test theme manager initialization with dark mode."""
+    def test_initialization_always_dark(self):
+        """Test theme manager always initializes to dark mode."""
+        theme = ThemeManager('light')  # Even with 'light', should be dark
+        assert theme.dark_mode is True
+        
         theme = ThemeManager('dark')
         assert theme.dark_mode is True
-    
-    def test_toggle(self):
-        """Test theme toggle."""
-        theme = ThemeManager('light')
-        assert theme.dark_mode is False
         
-        with patch('gui.utils.theme.ui'):
-            theme.toggle()
-        
+        theme = ThemeManager()  # Default
         assert theme.dark_mode is True
     
-    def test_get_theme_classes(self):
-        """Test getting theme classes."""
+    def test_get_theme_classes_always_dark(self):
+        """Test getting theme classes always returns dark classes."""
         theme = ThemeManager('light')
-        assert theme.get_theme_classes('light-class', 'dark-class') == 'light-class'
+        assert theme.get_theme_classes('light-class', 'dark-class') == 'dark-class'
         
         theme = ThemeManager('dark')
         assert theme.get_theme_classes('light-class', 'dark-class') == 'dark-class'
@@ -202,16 +193,25 @@ class TestUniversusGUIInitialization:
         assert gui.config == mock_config
         assert gui.state is not None
         assert gui.theme is not None
-        assert gui.theme.dark_mode is False
+        assert gui.theme.dark_mode is True  # Always dark mode
     
     def test_initialization_dark_mode(self, mock_dependencies):
-        """Test GUI initialization with dark mode."""
+        """Test GUI initialization always uses dark mode."""
         mock_db, mock_api, mock_service, mock_config = mock_dependencies
         mock_config.get.return_value = 'dark'
         
         gui = UniversusGUI(mock_db, mock_api, mock_service, mock_config)
         
         assert gui.theme.dark_mode is True
+    
+    def test_initialization_light_mode_ignored(self, mock_dependencies):
+        """Test GUI initialization ignores light mode setting."""
+        mock_db, mock_api, mock_service, mock_config = mock_dependencies
+        mock_config.get.return_value = 'light'
+        
+        gui = UniversusGUI(mock_db, mock_api, mock_service, mock_config)
+        
+        assert gui.theme.dark_mode is True  # Still dark mode
     
     def test_ui_components_initialized_as_none(self, mock_dependencies):
         """Test that UI components start as None."""
@@ -416,16 +416,9 @@ class TestUniversusGUIThemeToggle:
         mock_config.get.return_value = 'light'
         return UniversusGUI(mock_db, mock_api, mock_service, mock_config)
     
-    def test_toggle_theme(self, gui_instance):
-        """Test theme toggle."""
-        initial_mode = gui_instance.theme.dark_mode
-        
-        with patch('gui.app.ui') as mock_ui, \
-             patch.object(gui_instance.theme, 'toggle') as mock_toggle:
-            gui_instance.toggle_theme()
-        
-        mock_toggle.assert_called_once()
-        mock_ui.notify.assert_called_once()
+    def test_gui_uses_dark_mode(self, gui_instance):
+        """Test GUI always uses dark mode."""
+        assert gui_instance.theme.dark_mode is True
 
 
 class TestUniversusGUIAsyncOperations:
@@ -576,27 +569,26 @@ class TestAppStateEdgeCases:
 
 
 class TestThemeManagerEdgeCases:
-    """Additional test cases for ThemeManager."""
+    """Additional test cases for ThemeManager (dark mode only)."""
     
-    def test_toggle_twice(self):
-        """Test toggling theme twice returns to original."""
+    def test_always_dark_mode(self):
+        """Test theme is always dark mode regardless of input."""
         theme = ThemeManager('light')
-        assert theme.dark_mode is False
-        
-        with patch('gui.utils.theme.ui'):
-            theme.toggle()
         assert theme.dark_mode is True
         
-        with patch('gui.utils.theme.ui'):
-            theme.toggle()
-        assert theme.dark_mode is False
+        theme = ThemeManager('dark')
+        assert theme.dark_mode is True
     
-    def test_get_theme_classes_with_none(self):
-        """Test getting theme classes with None input."""
+    def test_get_theme_classes_returns_dark(self):
+        """Test getting theme classes always returns dark classes."""
         theme = ThemeManager('light')
-        assert theme.get_theme_classes(None, 'dark-class') is None
+        assert theme.get_theme_classes('light-class', 'dark-class') == 'dark-class'
         
         theme = ThemeManager('dark')
+        assert theme.get_theme_classes('light-class', 'dark-class') == 'dark-class'
+        
+        # Even with None, returns whatever dark value is
+        theme = ThemeManager('light')
         assert theme.get_theme_classes('light-class', None) is None
 
 

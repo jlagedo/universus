@@ -1,103 +1,135 @@
 """
 Navigation sidebar component.
+
+Uses the unified design system for consistent styling.
 """
 
 from typing import Callable
 from nicegui import ui
 
 from ..utils.icons import GameIcons
+from ..utils.design_system import PROPS
 
 
 class Sidebar:
     """Navigation sidebar component."""
     
-    def __init__(self, on_view_change: Callable, dark_mode: bool = False):
+    def __init__(self, on_view_change: Callable):
         """Initialize sidebar component.
         
         Args:
             on_view_change: Callback when view changes
-            dark_mode: Whether dark mode is active
         """
-        self.dark_mode = dark_mode
         self._render(on_view_change)
     
     def _render(self, on_view_change: Callable):
         """Render the sidebar with collapsible sections."""
-        sidebar_class = 'bg-gray-100' if not self.dark_mode else 'bg-gray-800'
-        nav_label_class = 'text-lg font-bold p-4 text-gray-900' if not self.dark_mode else 'text-lg font-bold p-4 text-white'
-        
-        with ui.left_drawer(value=True).classes(sidebar_class):
-            ui.label('Navigation').classes(nav_label_class)
+        with ui.left_drawer(value=True):
+            # Navigation header
+            with ui.row().classes('w-full items-center gap-2 p-4'):
+                ui.icon('menu').classes('text-gray-400')
+                ui.label('Navigation').classes('text-lg font-bold text-white')
             
-            with ui.column().classes('w-full gap-0'):
+            with ui.column().classes('w-full gap-1 px-2'):
                 # Dashboard - always visible at top
-                ui.button(
+                self._nav_button(
                     'Dashboard',
-                    icon=GameIcons.DASHBOARD,
-                    on_click=lambda: on_view_change('dashboard')
-                ).classes('w-full justify-start').props('flat align=left')
+                    GameIcons.DASHBOARD,
+                    lambda: on_view_change('dashboard')
+                )
                 
                 ui.separator().classes('my-2')
                 
                 # Market Data Section - Collapsible
-                with ui.expansion('Market Data', icon=GameIcons.CHART_BAR, value=False).classes('w-full').props('dense header-class="text-weight-medium"'):
-                    with ui.column().classes('w-full gap-0 pl-2'):
-                        ui.button(
+                with ui.expansion(
+                    'Market Data', 
+                    icon=GameIcons.CHART_BAR, 
+                    value=False
+                ).classes('w-full').props(PROPS.EXPANSION_DENSE):
+                    with ui.column().classes('w-full gap-1 pl-2'):
+                        self._nav_button(
                             'Datacenters',
-                            icon=GameIcons.DATACENTER,
-                            on_click=lambda: on_view_change('datacenters')
-                        ).classes('w-full justify-start').props('flat align=left dense')
-                        
-                        ui.button(
+                            GameIcons.DATACENTER,
+                            lambda: on_view_change('datacenters'),
+                            dense=True
+                        )
+                        self._nav_button(
                             'Top Items',
-                            icon=GameIcons.TRENDING,
-                            on_click=lambda: on_view_change('top')
-                        ).classes('w-full justify-start').props('flat align=left dense')
+                            GameIcons.TRENDING,
+                            lambda: on_view_change('top'),
+                            dense=True
+                        )
                 
                 # Analysis Section - Collapsible
-                with ui.expansion('Analysis', icon=GameIcons.ANALYTICS, value=False).classes('w-full').props('dense header-class="text-weight-medium"'):
-                    with ui.column().classes('w-full gap-0 pl-2'):
-                        ui.button(
+                with ui.expansion(
+                    'Analysis', 
+                    icon=GameIcons.ANALYTICS, 
+                    value=False
+                ).classes('w-full').props(PROPS.EXPANSION_DENSE):
+                    with ui.column().classes('w-full gap-1 pl-2'):
+                        self._nav_button(
                             'Item Report',
-                            icon=GameIcons.ANALYTICS,
-                            on_click=lambda: on_view_change('report')
-                        ).classes('w-full justify-start').props('flat align=left dense')
-                        
-                        ui.button(
+                            GameIcons.ANALYTICS,
+                            lambda: on_view_change('report'),
+                            dense=True
+                        )
+                        self._nav_button(
                             'Sell Volume by World',
-                            icon=GameIcons.INSIGHTS,
-                            on_click=lambda: on_view_change('sell_volume')
-                        ).classes('w-full justify-start').props('flat align=left dense')
-
-                        ui.button(
+                            GameIcons.INSIGHTS,
+                            lambda: on_view_change('sell_volume'),
+                            dense=True
+                        )
+                        self._nav_button(
                             'Sell Volume Chart',
-                            icon=GameIcons.CHART_PIE,
-                            on_click=lambda: on_view_change('sell_volume_chart')
-                        ).classes('w-full justify-start').props('flat align=left dense')
-                        
-                        ui.button(
+                            GameIcons.CHART_PIE,
+                            lambda: on_view_change('sell_volume_chart'),
+                            dense=True
+                        )
+                        self._nav_button(
                             'Market Analysis',
-                            icon=GameIcons.CHART_BAR,
-                            on_click=lambda: on_view_change('market_analysis')
-                        ).classes('w-full justify-start').props('flat align=left dense')
+                            GameIcons.CHART_BAR,
+                            lambda: on_view_change('market_analysis'),
+                            dense=True
+                        )
                 
                 # Settings Section - Collapsible  
-                with ui.expansion('Settings', icon=GameIcons.SETTINGS, value=False).classes('w-full').props('dense header-class="text-weight-medium"'):
-                    with ui.column().classes('w-full gap-0 pl-2'):
-                        ui.button(
-                            'Appearance',
-                            icon=GameIcons.THEME_DARK,
-                            on_click=lambda: on_view_change('appearance')
-                        ).classes('w-full justify-start').props('flat align=left dense')
-                        
-                        ui.button(
+                with ui.expansion(
+                    'Settings', 
+                    icon=GameIcons.SETTINGS, 
+                    value=False
+                ).classes('w-full').props(PROPS.EXPANSION_DENSE):
+                    with ui.column().classes('w-full gap-1 pl-2'):
+                        self._nav_button(
                             'Import Static Data',
-                            icon=GameIcons.CLOUD_DOWNLOAD,
-                            on_click=lambda: on_view_change('import_static_data')
-                        ).classes('w-full justify-start').props('flat align=left dense')
-                        
-                        ui.button(
+                            GameIcons.CLOUD_DOWNLOAD,
+                            lambda: on_view_change('import_static_data'),
+                            dense=True
+                        )
+                        self._nav_button(
                             'Tracked Worlds',
-                            icon=GameIcons.WORLD,
-                            on_click=lambda: on_view_change('tracked_worlds')
-                        ).classes('w-full justify-start').props('flat align=left dense')
+                            GameIcons.WORLD,
+                            lambda: on_view_change('tracked_worlds'),
+                            dense=True
+                        )
+    
+    def _nav_button(
+        self, 
+        label: str, 
+        icon: str, 
+        on_click: Callable, 
+        dense: bool = False
+    ):
+        """Create a navigation button with consistent styling.
+        
+        Args:
+            label: Button label
+            icon: Icon name
+            on_click: Click handler
+            dense: Whether to use dense styling
+        """
+        props = 'flat align=left dense' if dense else 'flat align=left'
+        ui.button(
+            label,
+            icon=icon,
+            on_click=on_click
+        ).classes('w-full justify-start').props(props)

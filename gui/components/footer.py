@@ -1,5 +1,8 @@
 """
 Application footer component.
+
+Provides status bar and version information.
+Uses the unified design system for consistent styling.
 """
 
 from typing import Optional
@@ -9,33 +12,42 @@ from nicegui import ui
 class Footer:
     """Application footer with status bar."""
     
-    def __init__(self, version: str = "1.0.0", dark_mode: bool = False):
+    def __init__(self, version: str = "1.0.0"):
         """Initialize footer component.
         
         Args:
             version: Application version
-            dark_mode: Whether dark mode is active
         """
         self.status_label: Optional[ui.label] = None
-        self.dark_mode = dark_mode
         self._render(version)
     
     def _render(self, version: str):
         """Render the footer."""
-        footer_class = 'bg-gray-200' if not self.dark_mode else 'bg-gray-900'
-        label_class = 'text-sm text-gray-600' if not self.dark_mode else 'text-sm text-gray-300'
-        label_light_class = 'text-sm text-gray-500' if not self.dark_mode else 'text-sm text-gray-400'
-        
-        with ui.footer().classes(footer_class):
+        with ui.footer().classes('items-center'):
             with ui.row().classes('w-full items-center justify-between px-4'):
-                self.status_label = ui.label('Ready').classes(label_class)
-                ui.label(f'Universus v{version} | Data from Universalis API').classes(label_light_class)
+                # Status indicator
+                with ui.row().classes('items-center gap-2'):
+                    self.status_icon = ui.icon('circle', size='xs').classes('text-teal-400')
+                    self.status_label = ui.label('Ready').classes('text-sm text-gray-300')
+                
+                # Version and attribution
+                ui.label(f'Universus v{version} • Data from Universalis API').classes('text-sm text-gray-500')
     
-    def set_status(self, message: str):
+    def set_status(self, message: str, status: str = "ready"):
         """Update status message.
         
         Args:
             message: Status message to display
+            status: Status type - 'ready', 'loading', 'error'
         """
         if self.status_label:
             self.status_label.set_text(message)
+        
+        # Update status icon color based on status
+        icon_colors = {
+            "ready": "text-teal-400",
+            "loading": "text-blue-400",
+            "error": "text-red-400",
+        }
+        if hasattr(self, 'status_icon'):
+            self.status_icon.classes(replace=icon_colors.get(status, "text-gray-400"))

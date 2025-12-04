@@ -1,11 +1,14 @@
 """
 Breadcrumb navigation component.
+
+Uses the unified design system for consistent styling.
 """
 
-from typing import List, Tuple, Optional, Callable
+from typing import Optional, Callable
 from nicegui import ui
 
 from ..utils.icons import GameIcons
+from ..utils.design_system import PROPS
 
 
 # View name to display name and section mapping
@@ -17,7 +20,6 @@ VIEW_CONFIG = {
     'sell_volume': {'label': 'Sell Volume by World', 'section': 'Analysis', 'icon': GameIcons.INSIGHTS},
     'sell_volume_chart': {'label': 'Sell Volume Chart', 'section': 'Analysis', 'icon': GameIcons.CHART_PIE},
     'market_analysis': {'label': 'Market Analysis', 'section': 'Analysis', 'icon': GameIcons.CHART_BAR},
-    'appearance': {'label': 'Appearance', 'section': 'Settings', 'icon': GameIcons.THEME_DARK},
     'import_static_data': {'label': 'Import Static Data', 'section': 'Settings', 'icon': GameIcons.CLOUD_DOWNLOAD},
     'tracked_worlds': {'label': 'Tracked Worlds', 'section': 'Settings', 'icon': GameIcons.WORLD},
 }
@@ -30,8 +32,7 @@ class Breadcrumb:
         self,
         current_view: str,
         selected_world: Optional[str] = None,
-        on_navigate: Optional[Callable] = None,
-        dark_mode: bool = False
+        on_navigate: Optional[Callable] = None
     ):
         """Initialize breadcrumb component.
         
@@ -39,49 +40,55 @@ class Breadcrumb:
             current_view: Current view name
             selected_world: Currently selected world (optional context)
             on_navigate: Callback when navigating via breadcrumb
-            dark_mode: Whether dark mode is active
         """
         self.current_view = current_view
         self.selected_world = selected_world
         self.on_navigate = on_navigate
-        self.dark_mode = dark_mode
         self.container = None
         self._render()
     
     def _render(self):
         """Render the breadcrumb."""
-        view_config = VIEW_CONFIG.get(self.current_view, {'label': self.current_view, 'section': None, 'icon': 'help'})
+        view_config = VIEW_CONFIG.get(
+            self.current_view, 
+            {'label': self.current_view, 'section': None, 'icon': 'help'}
+        )
         
-        bg_class = 'bg-gray-50' if not self.dark_mode else 'bg-gray-800'
-        text_class = 'text-gray-600' if not self.dark_mode else 'text-gray-300'
-        active_class = 'text-blue-600 font-semibold' if not self.dark_mode else 'text-blue-400 font-semibold'
-        separator_class = 'text-gray-400' if not self.dark_mode else 'text-gray-500'
-        
-        self.container = ui.row().classes(f'w-full items-center gap-2 px-4 py-2 {bg_class} rounded-lg mb-4')
+        self.container = ui.row().classes(
+            'w-full items-center gap-2 px-4 py-2 rounded-lg mb-6'
+        )
         
         with self.container:
-            # Home icon - always links to dashboard
-            home_btn = ui.button(icon=GameIcons.HOME, on_click=lambda: self._navigate('dashboard')).props('flat dense round size=sm')
-            home_btn.classes(text_class)
-            
-            # Separator
-            ui.icon('chevron_right').classes(f'{separator_class} text-sm')
-            
-            # Section (if any)
-            section = view_config.get('section')
-            if section:
-                ui.label(section).classes(f'{text_class} text-sm')
-                ui.icon('chevron_right').classes(f'{separator_class} text-sm')
-            
-            # Current view with icon
-            ui.icon(view_config['icon']).classes(f'{active_class} text-sm')
-            ui.label(view_config['label']).classes(f'{active_class} text-sm')
-            
-            # World context (if selected and relevant)
-            if self.selected_world and self.current_view in ['top', 'report', 'datacenters']:
-                ui.icon('chevron_right').classes(f'{separator_class} text-sm')
-                ui.icon(GameIcons.WORLD).classes(f'{active_class} text-sm')
-                ui.label(self.selected_world).classes(f'{active_class} text-sm')
+            self._render_content(view_config)
+    
+    def _render_content(self, view_config: dict):
+        """Render breadcrumb content."""
+        # Home button - always links to dashboard
+        ui.button(
+            icon=GameIcons.HOME, 
+            on_click=lambda: self._navigate('dashboard')
+        ).props('flat dense round size=sm').classes('text-gray-400 hover:text-white')
+        
+        # Separator
+        ui.icon('chevron_right').classes('text-gray-600 text-sm')
+        
+        # Section (if any)
+        section = view_config.get('section')
+        if section:
+            ui.label(section).classes('text-sm text-gray-400')
+            ui.icon('chevron_right').classes('text-gray-600 text-sm')
+        
+        # Current view with icon
+        with ui.row().classes('items-center gap-1'):
+            ui.icon(view_config['icon']).classes('text-blue-400 text-sm')
+            ui.label(view_config['label']).classes('text-sm font-semibold text-blue-400')
+        
+        # World context (if selected and relevant)
+        if self.selected_world and self.current_view in ['top', 'report', 'datacenters']:
+            ui.icon('chevron_right').classes('text-gray-600 text-sm')
+            with ui.row().classes('items-center gap-1'):
+                ui.icon(GameIcons.WORLD).classes('text-blue-400 text-sm')
+                ui.label(self.selected_world).classes('text-sm font-semibold text-blue-400')
     
     def _navigate(self, view: str):
         """Navigate to a view."""
@@ -97,44 +104,21 @@ class Breadcrumb:
         """
         self.current_view = current_view
         self.selected_world = selected_world
+        
         if self.container:
             self.container.clear()
+            view_config = VIEW_CONFIG.get(
+                self.current_view, 
+                {'label': self.current_view, 'section': None, 'icon': 'help'}
+            )
             with self.container:
-                self._render_content()
-    
-    def _render_content(self):
-        """Render breadcrumb content (for updates)."""
-        view_config = VIEW_CONFIG.get(self.current_view, {'label': self.current_view, 'section': None, 'icon': 'help'})
-        
-        text_class = 'text-gray-600' if not self.dark_mode else 'text-gray-300'
-        active_class = 'text-blue-600 font-semibold' if not self.dark_mode else 'text-blue-400 font-semibold'
-        separator_class = 'text-gray-400' if not self.dark_mode else 'text-gray-500'
-        
-        # Home icon
-        home_btn = ui.button(icon=GameIcons.HOME, on_click=lambda: self._navigate('dashboard')).props('flat dense round size=sm')
-        home_btn.classes(text_class)
-        
-        ui.icon('chevron_right').classes(f'{separator_class} text-sm')
-        
-        section = view_config.get('section')
-        if section:
-            ui.label(section).classes(f'{text_class} text-sm')
-            ui.icon('chevron_right').classes(f'{separator_class} text-sm')
-        
-        ui.icon(view_config['icon']).classes(f'{active_class} text-sm')
-        ui.label(view_config['label']).classes(f'{active_class} text-sm')
-        
-        if self.selected_world and self.current_view in ['top', 'report', 'datacenters']:
-            ui.icon('chevron_right').classes(f'{separator_class} text-sm')
-            ui.icon(GameIcons.WORLD).classes(f'{active_class} text-sm')
-            ui.label(self.selected_world).classes(f'{active_class} text-sm')
+                self._render_content(view_config)
 
 
 def render_breadcrumb(
     current_view: str,
     selected_world: Optional[str] = None,
-    on_navigate: Optional[Callable] = None,
-    dark_mode: bool = False
+    on_navigate: Optional[Callable] = None
 ) -> Breadcrumb:
     """Render a breadcrumb navigation.
     
@@ -142,9 +126,8 @@ def render_breadcrumb(
         current_view: Current view name
         selected_world: Currently selected world
         on_navigate: Navigation callback
-        dark_mode: Whether dark mode is active
     
     Returns:
         Breadcrumb component instance
     """
-    return Breadcrumb(current_view, selected_world, on_navigate, dark_mode)
+    return Breadcrumb(current_view, selected_world, on_navigate)

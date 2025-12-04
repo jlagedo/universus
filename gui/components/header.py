@@ -1,11 +1,15 @@
 """
 Application header component.
+
+Provides the main navigation bar with datacenter/world selectors.
+Uses the unified design system for consistent styling.
 """
 
 from typing import Callable, Optional
 from nicegui import ui
 
 from ..utils.icons import GameIcons
+from ..utils.design_system import PROPS
 
 
 class Header:
@@ -20,8 +24,6 @@ class Header:
         on_datacenter_change: Callable,
         on_world_change: Callable,
         on_refresh: Callable,
-        on_theme_toggle: Callable,
-        dark_mode: bool = False,
         version: str = "1.0.0"
     ):
         """Initialize header component.
@@ -34,13 +36,10 @@ class Header:
             on_datacenter_change: Callback for datacenter change
             on_world_change: Callback for world change
             on_refresh: Callback for refresh button
-            on_theme_toggle: Callback for theme toggle
-            dark_mode: Whether dark mode is active
             version: Application version
         """
         self.datacenter_select: Optional[ui.select] = None
         self.world_select: Optional[ui.select] = None
-        self.dark_mode = dark_mode
         
         self._render(
             datacenter_names,
@@ -50,7 +49,6 @@ class Header:
             on_datacenter_change,
             on_world_change,
             on_refresh,
-            on_theme_toggle,
             version
         )
     
@@ -63,42 +61,42 @@ class Header:
         on_datacenter_change,
         on_world_change,
         on_refresh,
-        on_theme_toggle,
         version
     ):
         """Render the header."""
-        header_class = 'bg-blue-800 text-white' if not self.dark_mode else 'bg-gray-900 text-white'
-        
-        with ui.header().classes(header_class):
-            with ui.row().classes('w-full items-center'):
-                ui.icon(GameIcons.WORLD, size='lg').classes('mr-2')
-                ui.label('Universus').classes('text-2xl font-bold')
-                ui.label('FFXIV Market Tracker').classes('text-sm ml-2 opacity-75')
+        with ui.header().classes('items-center'):
+            with ui.row().classes('w-full items-center gap-4'):
+                # Logo and title
+                with ui.row().classes('items-center gap-2'):
+                    ui.icon(GameIcons.WORLD, size='lg').classes('text-blue-400')
+                    ui.label('Universus').classes('text-2xl font-bold text-white')
+                    ui.label('FFXIV Market Tracker').classes('text-sm text-gray-400 hidden sm:inline')
                 
                 ui.space()
                 
-                # Datacenter selector
-                select_class = 'bg-blue-700 text-white' if not self.dark_mode else 'bg-gray-800 text-white'
-                self.datacenter_select = ui.select(
-                    options=datacenter_names if datacenter_names else ['Loading...'],
-                    value=selected_datacenter if selected_datacenter else None,
-                    label='Datacenter',
-                    on_change=lambda e: on_datacenter_change(e.value) if e.value and e.value != 'Loading...' else None
-                ).classes(f'w-40 {select_class}').props('dark dense outlined' if self.dark_mode else 'dense outlined')
-                
-                # World selector
-                self.world_select = ui.select(
-                    options=worlds if worlds else ['Loading...'],
-                    value=selected_world if selected_world else None,
-                    label='World',
-                    on_change=lambda e: on_world_change(e.value) if e.value and e.value != 'Loading...' else None
-                ).classes(f'w-40 {select_class}').props('dark dense outlined' if self.dark_mode else 'dense outlined')
-                
-                ui.button(icon=GameIcons.REFRESH, on_click=on_refresh).props('flat round').tooltip('Refresh')
-                
-                # Theme toggle button
-                theme_icon = GameIcons.THEME_DARK if not self.dark_mode else GameIcons.THEME_LIGHT
-                ui.button(icon=theme_icon, on_click=on_theme_toggle).props('flat round').tooltip('Toggle Theme')
+                # Selectors row
+                with ui.row().classes('items-center gap-4'):
+                    # Datacenter selector
+                    self.datacenter_select = ui.select(
+                        options=datacenter_names if datacenter_names else ['Loading...'],
+                        value=selected_datacenter if selected_datacenter else None,
+                        label='Datacenter',
+                        on_change=lambda e: on_datacenter_change(e.value) if e.value and e.value != 'Loading...' else None
+                    ).classes('w-40').props(PROPS.SELECT_OUTLINED)
+                    
+                    # World selector
+                    self.world_select = ui.select(
+                        options=worlds if worlds else ['Loading...'],
+                        value=selected_world if selected_world else None,
+                        label='World',
+                        on_change=lambda e: on_world_change(e.value) if e.value and e.value != 'Loading...' else None
+                    ).classes('w-40').props(PROPS.SELECT_OUTLINED)
+                    
+                    # Refresh button with tooltip
+                    ui.button(
+                        icon=GameIcons.REFRESH, 
+                        on_click=on_refresh
+                    ).props(PROPS.BTN_ICON).tooltip('Refresh current view')
     
     def update_datacenters(self, datacenter_names: list, selected_datacenter: str):
         """Update datacenter options.

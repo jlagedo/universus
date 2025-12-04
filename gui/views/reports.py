@@ -1,10 +1,14 @@
 """
 Reports views (item report, sell volume, charts).
+
+Uses the unified design system for consistent styling.
 """
 
 import asyncio
 from nicegui import ui
 from ..utils.formatters import format_gil, format_velocity
+from ..utils.design_system import heading_classes, PROPS
+from ..components.cards import warning_card
 from config import get_config
 
 config = get_config()
@@ -16,20 +20,20 @@ def render_item_report(state, service, dark_mode: bool = False):
     Args:
         state: Application state
         service: Market service instance
-        dark_mode: Whether dark mode is active
+        dark_mode: Ignored (always dark mode)
     
     Returns:
         Tuple of (item_id_input, days_input, report_container)
     """
-    ui.label('Item Report').classes('text-2xl font-bold mb-4')
-    ui.label('View detailed historical report for a specific item.').classes('text-gray-500 mb-4')
+    ui.label('Item Report').classes(heading_classes(2))
+    ui.label('View detailed historical report for a specific item.').classes('text-gray-400 mb-6')
     
     if not state.selected_world:
-        ui.label('Please select a world first.').classes('text-yellow-600')
+        warning_card('No world selected', 'Please select a world from the header dropdown.')
         return None, None, None
     
-    with ui.card().classes('w-full max-w-xl'):
-        ui.label('Report Parameters').classes('text-lg font-semibold mb-2')
+    with ui.card().classes('w-full max-w-xl p-4'):
+        ui.label('Report Parameters').classes('text-lg font-semibold text-white mb-4')
         
         item_id_input = ui.number('Item ID', value=0, min=1).classes('w-full')
         days_input = ui.number(
@@ -63,12 +67,12 @@ def generate_item_report(state, service, item_id, days, container, set_status):
         
         with container:
             if not snapshots:
-                ui.label(f'No data available for item {item_id} on {state.selected_world}').classes('text-yellow-600')
+                warning_card('No data available', f'No data available for item {item_id} on {state.selected_world}')
                 return
             
             item_name = service.get_item_name(item_id) or f"Item #{item_id}"
-            ui.label(f'{item_name}').classes('text-xl font-bold')
-            ui.label(f'{state.selected_world} • {len(snapshots)} days of data').classes('text-gray-500 mb-4')
+            ui.label(f'{item_name}').classes('text-xl font-bold text-white')
+            ui.label(f'{state.selected_world} • {len(snapshots)} days of data').classes('text-gray-400 mb-4')
             
             trends = service.calculate_trends(snapshots)
             if trends:
@@ -120,7 +124,7 @@ def generate_item_report(state, service, item_id, days, container, set_status):
         
     except Exception as e:
         with container:
-            ui.label(f'Error: {e}').classes('text-red-600')
+            ui.label(f'Error: {e}').classes('text-red-500')
         set_status('Error')
         ui.notify(f'Error: {e}', type='negative')
 
@@ -131,19 +135,17 @@ def render_sell_volume(state, service, dark_mode: bool = False):
     Args:
         state: Application state
         service: Market service instance
-        dark_mode: Whether dark mode is active
+        dark_mode: Ignored (always dark mode)
     
     Returns:
         Tuple of (world_options, world_select, limit_input, report_container)
     """
-    ui.label('Sell Volume by World').classes('text-2xl font-bold mb-4')
-    ui.label('Top items by HQ sales velocity for selected tracked world.').classes('text-gray-500 mb-4')
+    ui.label('Sell Volume by World').classes(heading_classes(2))
+    ui.label('Top items by HQ sales velocity for selected tracked world.').classes('text-gray-400 mb-6')
     
     tracked = service.list_tracked_worlds()
     if not tracked:
-        with ui.card().classes('w-full bg-yellow-50'):
-            ui.label('No tracked worlds configured.').classes('text-yellow-700')
-            ui.label('Add tracked worlds in Settings > Tracked Worlds first.').classes('text-sm text-yellow-600')
+        warning_card('No tracked worlds configured', 'Add tracked worlds in Settings > Tracked Worlds first.')
         return None, None, None, None
     
     world_options = {}
@@ -153,15 +155,15 @@ def render_sell_volume(state, service, dark_mode: bool = False):
         world_options[world_name] = world_id
     
     # Sticky filter card
-    with ui.card().classes('w-full max-w-xl sticky top-0 z-10').style('position: sticky; top: 0;'):
-        ui.label('Filter').classes('text-lg font-semibold mb-2')
+    with ui.card().classes('w-full max-w-xl p-4 sticky top-0 z-10').style('position: sticky; top: 0;'):
+        ui.label('Filters').classes('text-lg font-semibold text-white mb-4')
         
         selected_world_name = list(world_options.keys())[0] if world_options else None
         world_select = ui.select(
             options=list(world_options.keys()),
             value=selected_world_name,
             label='Tracked World'
-        ).classes('w-full')
+        ).classes('w-full').props(PROPS.SELECT_OUTLINED)
         
         limit_input = ui.number('Limit', value=100, min=1, max=500).classes('w-full')
         report_container = ui.column().classes('w-full mt-4')
@@ -194,10 +196,10 @@ def generate_sell_volume_report(state, service, world_options, world_name, limit
         
         with container:
             if not results:
-                ui.label(f'No data available for {world_name}. Run "Update Current Prices" CLI command first.').classes('text-yellow-600')
+                warning_card('No data available', f'No data available for {world_name}. Run "Update Current Prices" CLI command first.')
                 return
             
-            ui.label(f'Top {len(results)} items by HQ daily velocity on {world_name}').classes('text-lg font-semibold mb-2')
+            ui.label(f'Top {len(results)} items by HQ daily velocity on {world_name}').classes('text-lg font-semibold text-white mb-4')
             
             columns = [
                 {'name': 'rank', 'label': 'Rank', 'field': 'rank', 'align': 'center'},
@@ -281,13 +283,13 @@ def generate_sell_volume_report(state, service, world_options, world_name, limit
                 <q-td :props="props" class="metric-volume text-weight-bold">{{ props.row.gil_volume }}</q-td>
             ''')
             
-            ui.label(f'Showing {len(results)} items').classes('text-sm text-gray-500 mt-2')
+            ui.label(f'Showing {len(results)} items').classes('text-sm text-gray-400 mt-2')
         
         set_status('Ready')
         
     except Exception as e:
         with container:
-            ui.label(f'Error: {e}').classes('text-red-600')
+            ui.label(f'Error: {e}').classes('text-red-500')
         set_status('Error')
         ui.notify(f'Error: {e}', type='negative')
 
@@ -298,19 +300,17 @@ def render_sell_volume_chart(state, service, dark_mode: bool = False):
     Args:
         state: Application state
         service: Market service instance
-        dark_mode: Whether dark mode is active
+        dark_mode: Ignored (always dark mode)
     
     Returns:
         Tuple of (world_options, world_select, chart_container)
     """
-    ui.label('Sell Volume Chart').classes('text-2xl font-bold mb-4')
-    ui.label('Pie chart of top 10 items by HQ gil volume (velocity * price).').classes('text-gray-500 mb-4')
+    ui.label('Sell Volume Chart').classes(heading_classes(2))
+    ui.label('Visualization of top 10 items by HQ gil volume.').classes('text-gray-400 mb-6')
     
     tracked = service.list_tracked_worlds()
     if not tracked:
-        with ui.card().classes('w-full bg-yellow-50'):
-            ui.label('No tracked worlds configured.').classes('text-yellow-700')
-            ui.label('Add tracked worlds first to view chart.').classes('text-sm text-yellow-600')
+        warning_card('No tracked worlds configured', 'Add tracked worlds first to view chart.')
         return None, None, None
     
     world_options = {}
@@ -319,10 +319,14 @@ def render_sell_volume_chart(state, service, dark_mode: bool = False):
         wname = w.get('world_name') or state.world_id_to_name.get(wid, f"World {wid}")
         world_options[wname] = wid
     
-    with ui.card().classes('w-full max-w-xl'):
-        ui.label('Filter').classes('text-lg font-semibold mb-2')
+    with ui.card().classes('w-full max-w-xl p-4'):
+        ui.label('Filters').classes('text-lg font-semibold text-white mb-4')
         selected_world_name = list(world_options.keys())[0] if world_options else None
-        world_select = ui.select(options=list(world_options.keys()), value=selected_world_name, label='Tracked World').classes('w-full')
+        world_select = ui.select(
+            options=list(world_options.keys()), 
+            value=selected_world_name, 
+            label='Tracked World'
+        ).classes('w-full').props(PROPS.SELECT_OUTLINED)
         
         chart_container = ui.column().classes('w-full mt-4')
     
@@ -353,14 +357,14 @@ def generate_chart(state, service, world_options, world_name, container, set_sta
         
         if not data_points:
             with container:
-                ui.label('No data available. Run price update first.').classes('text-yellow-600')
+                warning_card('No data available', 'No data available. Run price update first.')
             set_status('Ready')
             return
         
         total_volume = sum(item['gil_volume'] for item in data_points)
         
         with container:
-            ui.label(f'Top 10 Gil Volume Items on {world_name} (Total {format_gil(total_volume)} gil)').classes('text-lg font-semibold mb-2')
+            ui.label(f'Top 10 Gil Volume Items on {world_name} (Total {format_gil(total_volume)} gil)').classes('text-lg font-semibold text-white mb-4')
             
             labels = [item['name'] for item in data_points]
             values = [item['gil_volume'] for item in data_points]
@@ -411,6 +415,6 @@ def generate_chart(state, service, world_options, world_name, container, set_sta
         set_status('Ready')
     except Exception as e:
         with container:
-            ui.label(f'Error: {e}').classes('text-red-600')
+            ui.label(f'Error: {e}').classes('text-red-500')
         set_status('Error')
         ui.notify(f'Error: {e}', type='negative')

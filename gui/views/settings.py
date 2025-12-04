@@ -1,102 +1,14 @@
 """
-Settings views (import static data, tracked worlds, appearance).
+Settings views (import static data, tracked worlds).
+
+Uses the unified design system for consistent styling.
 """
 
 import asyncio
 from nicegui import ui
-from ..components.cards import progress_card, warning_card, success_card
+from ..components.cards import progress_card, warning_card, success_card, section_card
 from ..utils.icons import GameIcons
-
-
-def render_appearance_settings(theme_manager, on_theme_toggle, dark_mode: bool = False):
-    """Render appearance settings view.
-    
-    Args:
-        theme_manager: ThemeManager instance
-        on_theme_toggle: Callback for theme toggle
-        dark_mode: Whether dark mode is active
-    
-    Returns:
-        None
-    """
-    ui.label('Appearance Settings').classes('text-2xl font-bold mb-4')
-    ui.label('Customize the look and feel of the application.').classes('text-gray-500 mb-4')
-    
-    with ui.card().classes('w-full max-w-xl'):
-        ui.label('Theme').classes('text-lg font-semibold mb-4')
-        
-        # Theme toggle with visual indicator
-        with ui.row().classes('w-full items-center justify-between'):
-            with ui.column().classes('gap-1'):
-                ui.label('Dark Mode').classes('font-medium')
-                ui.label('Switch between light and dark color themes').classes('text-sm text-gray-500')
-            
-            theme_switch = ui.switch(
-                value=dark_mode,
-                on_change=lambda e: on_theme_toggle()
-            ).props('color=primary')
-        
-        ui.separator().classes('my-4')
-        
-        # Theme preview cards
-        ui.label('Theme Preview').classes('text-sm font-medium mb-2')
-        
-        with ui.row().classes('gap-4'):
-            # Light theme preview
-            with ui.card().classes('w-32 h-24 cursor-pointer').style(
-                'background: #ffffff; border: 2px solid ' + ('#e0e0e0' if dark_mode else '#1976d2')
-            ):
-                with ui.column().classes('items-center justify-center h-full'):
-                    ui.icon(GameIcons.THEME_LIGHT, size='sm').style('color: #1976d2')
-                    ui.label('Light').classes('text-xs').style('color: #333333')
-            
-            # Dark theme preview
-            with ui.card().classes('w-32 h-24 cursor-pointer').style(
-                'background: #1a1b26; border: 2px solid ' + ('#7aa2f7' if dark_mode else '#e0e0e0')
-            ):
-                with ui.column().classes('items-center justify-center h-full'):
-                    ui.icon(GameIcons.THEME_DARK, size='sm').style('color: #7aa2f7')
-                    ui.label('Dark').classes('text-xs').style('color: #c0caf5')
-        
-        ui.separator().classes('my-4')
-        
-        # Accessibility info
-        ui.label('Accessibility').classes('text-lg font-semibold mb-2')
-        
-        with ui.column().classes('gap-2'):
-            with ui.row().classes('items-center gap-2'):
-                ui.icon('check_circle', size='xs').classes('text-green-600')
-                ui.label('WCAG 2.1 AA contrast compliant').classes('text-sm')
-            
-            with ui.row().classes('items-center gap-2'):
-                ui.icon('check_circle', size='xs').classes('text-green-600')
-                ui.label('Full keyboard navigation support').classes('text-sm')
-            
-            with ui.row().classes('items-center gap-2'):
-                ui.icon('check_circle', size='xs').classes('text-green-600')
-                ui.label('Focus indicators for all interactive elements').classes('text-sm')
-        
-        ui.separator().classes('my-4')
-        
-        # Keyboard shortcuts info
-        ui.label('Keyboard Shortcuts').classes('text-sm font-medium mb-2')
-        
-        with ui.column().classes('gap-1'):
-            with ui.row().classes('items-center gap-2'):
-                ui.html('<kbd class="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded text-xs font-mono">Tab</kbd>').classes('')
-                ui.label('Navigate between elements').classes('text-sm text-gray-600')
-            
-            with ui.row().classes('items-center gap-2'):
-                ui.html('<kbd class="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded text-xs font-mono">Enter</kbd>').classes('')
-                ui.label('Activate buttons and links').classes('text-sm text-gray-600')
-            
-            with ui.row().classes('items-center gap-2'):
-                ui.html('<kbd class="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded text-xs font-mono">Space</kbd>').classes('')
-                ui.label('Toggle checkboxes and switches').classes('text-sm text-gray-600')
-            
-            with ui.row().classes('items-center gap-2'):
-                ui.html('<kbd class="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded text-xs font-mono">Esc</kbd>').classes('')
-                ui.label('Close dialogs and menus').classes('text-sm text-gray-600')
+from ..utils.design_system import heading_classes, PROPS
 
 
 def render_import_static_data(service, dark_mode: bool = False):
@@ -104,26 +16,35 @@ def render_import_static_data(service, dark_mode: bool = False):
     
     Args:
         service: Market service instance
-        dark_mode: Whether dark mode is active
+        dark_mode: Ignored (always dark mode)
     
     Returns:
         progress_container for updates
     """
-    ui.label('Import Static Data').classes('text-2xl font-bold mb-4')
-    ui.label('Download item names and marketable items data.').classes('text-gray-500 mb-4')
+    ui.label('Import Static Data').classes(heading_classes(2))
+    ui.label('Download item names and marketable items data.').classes('text-gray-400 mb-6')
     
     items_count = service.get_items_count()
     marketable_count = service.get_marketable_items_count()
     
-    with ui.card().classes('w-full max-w-xl'):
-        ui.label('Static Data').classes('text-lg font-semibold mb-2')
-        ui.label(f'Item names in database: {items_count:,}').classes('text-gray-600')
-        ui.label(f'Marketable items in database: {marketable_count:,}').classes('text-gray-600')
+    with ui.card().classes('w-full max-w-xl p-4'):
+        ui.label('Database Status').classes('text-lg font-semibold text-white mb-4')
         
-        ui.label('This will fetch:').classes('text-sm text-gray-500 mt-4')
-        ui.label('• ~47,000 item names from FFXIV Teamcraft').classes('text-sm text-gray-500 ml-2')
-        ui.label('• ~30,000 marketable item IDs from Universalis API').classes('text-sm text-gray-500 ml-2')
-        ui.label('Any existing data will be replaced.').classes('text-sm text-gray-400 mt-2')
+        with ui.row().classes('gap-8 mb-4'):
+            with ui.column().classes('gap-1'):
+                ui.label('Item Names').classes('text-sm text-gray-400')
+                ui.label(f'{items_count:,}').classes('text-xl font-bold text-white')
+            with ui.column().classes('gap-1'):
+                ui.label('Marketable Items').classes('text-sm text-gray-400')
+                ui.label(f'{marketable_count:,}').classes('text-xl font-bold text-white')
+        
+        ui.separator().classes('my-4')
+        
+        ui.label('This will fetch:').classes('text-sm text-gray-400')
+        with ui.column().classes('gap-1 ml-2'):
+            ui.label('• ~47,000 item names from FFXIV Teamcraft').classes('text-sm text-gray-500')
+            ui.label('• ~30,000 marketable item IDs from Universalis API').classes('text-sm text-gray-500')
+        ui.label('Any existing data will be replaced.').classes('text-sm text-gray-500 mt-2')
         
         progress_container = ui.column().classes('w-full mt-4')
     
@@ -138,13 +59,14 @@ async def execute_import_static_data(service, progress_container, set_status):
         progress_container: UI container for progress
         set_status: Status callback
     """
+    progress_container.clear()
+    
     with progress_container:
-        progress_container.clear()
-        
-        with ui.card().classes('w-full bg-blue-50'):
-            ui.label('Importing static data...').classes('text-blue-700 font-semibold')
-            ui.linear_progress(show_value=False).props('indeterminate')
-            status_label = ui.label('Fetching item names from FFXIV Teamcraft...').classes('text-sm text-blue-600')
+        progress, status_label = progress_card(
+            'Importing static data...',
+            'Fetching item names from FFXIV Teamcraft...',
+            show_value=False
+        )
         
         set_status('Importing static data...')
         
@@ -163,12 +85,13 @@ async def execute_import_static_data(service, progress_container, set_status):
                 success_card(f'Imported {items_count:,} item names and {marketable_count:,} marketable items')
             
             set_status('Ready')
-            ui.notify(f'Imported static data successfully', type='positive')
+            ui.notify('Imported static data successfully', type='positive')
             
         except Exception as e:
             progress_container.clear()
             with progress_container:
-                ui.label(f'Error: {e}').classes('text-red-600')
+                with ui.card().classes('w-full p-4 border-l-4').style('border-left-color: #FF6B6B'):
+                    ui.label(f'Error: {e}').classes('text-red-400')
             set_status('Error')
             ui.notify(f'Error: {e}', type='negative')
 
@@ -179,25 +102,25 @@ def render_tracked_worlds(state, service, dark_mode: bool = False):
     Args:
         state: Application state
         service: Market service instance
-        dark_mode: Whether dark mode is active
+        dark_mode: Ignored (always dark mode)
     
     Returns:
         Tuple of (world_select, worlds_container) for dynamic updates
     """
-    ui.label('Tracked Worlds').classes('text-2xl font-bold mb-4')
-    ui.label('Manage the list of worlds to track.').classes('text-gray-500 mb-4')
+    ui.label('Tracked Worlds').classes(heading_classes(2))
+    ui.label('Manage the list of worlds to track for market data.').classes('text-gray-400 mb-6')
     
     # Add world section
-    with ui.card().classes('w-full max-w-xl'):
-        ui.label('Add World').classes('text-lg font-semibold mb-2')
+    with ui.card().classes('w-full max-w-xl p-4'):
+        ui.label('Add World').classes('text-lg font-semibold text-white mb-4')
         
         world_select = ui.select(
             options=sorted(list(state.world_name_to_id.keys())),
             label='World'
-        ).classes('w-full')
+        ).classes('w-full').props(PROPS.SELECT_OUTLINED)
     
     # Existing tracked worlds
-    worlds_container = ui.column().classes('w-full mt-4')
+    worlds_container = ui.column().classes('w-full mt-6')
     
     return world_select, worlds_container
 
@@ -217,9 +140,9 @@ def render_tracked_worlds_table(state, service, container, on_refresh):
     
     with container:
         if not tracked:
-            warning_card('No tracked worlds configured.', '')
+            warning_card('No tracked worlds configured', 'Add a world above to start tracking market data.')
         else:
-            ui.label('Configured Worlds').classes('text-lg font-semibold mb-2')
+            ui.label('Configured Worlds').classes('text-lg font-semibold text-white mb-4')
             
             columns = [
                 {'name': 'world_id', 'label': 'World ID', 'field': 'world_id', 'align': 'left'},
@@ -242,7 +165,9 @@ def render_tracked_worlds_table(state, service, container, on_refresh):
             slot_html = (
                 '<q-td key="actions" :props="props">'
                 f'<q-btn size="sm" flat color="negative" icon="{GameIcons.DELETE}" '
-                '@click="$parent.$emit(\'remove_world\', props.row)"></q-btn>'
+                '@click="$parent.$emit(\'remove_world\', props.row)">'
+                '<q-tooltip>Remove world</q-tooltip>'
+                '</q-btn>'
                 '</q-td>'
             )
             table.add_slot('body-cell-actions', slot_html)

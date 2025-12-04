@@ -89,12 +89,6 @@ class UniversusGUI:
         if self.footer:
             self.footer.set_status(message)
     
-    def toggle_theme(self):
-        """Toggle between light and dark themes."""
-        self.theme.toggle()
-        ui.notify(f'Switched to {"dark" if self.theme.dark_mode else "light"} theme', type='info')
-        logger.info(f'Theme changed to {"dark" if self.theme.dark_mode else "light"}')
-    
     def create_header(self):
         """Create the application header."""
         self.header = Header(
@@ -105,23 +99,19 @@ class UniversusGUI:
             on_datacenter_change=self.change_datacenter,
             on_world_change=self.change_world,
             on_refresh=self.refresh_current_view,
-            on_theme_toggle=self.toggle_theme,
-            dark_mode=self.theme.dark_mode,
             version=__version__
         )
     
     def create_sidebar(self):
         """Create the navigation sidebar."""
         self.sidebar = Sidebar(
-            on_view_change=self.show_view,
-            dark_mode=self.theme.dark_mode
+            on_view_change=self.show_view
         )
     
     def create_footer(self):
         """Create the application footer."""
         self.footer = Footer(
-            version=__version__,
-            dark_mode=self.theme.dark_mode
+            version=__version__
         )
     
     def create_main_content(self):
@@ -147,8 +137,7 @@ class UniversusGUI:
             render_breadcrumb(
                 current_view=view,
                 selected_world=self.state.selected_world,
-                on_navigate=self.show_view,
-                dark_mode=self.theme.dark_mode
+                on_navigate=self.show_view
             )
             
             if view == 'dashboard':
@@ -159,8 +148,6 @@ class UniversusGUI:
                 self._render_top_items()
             elif view == 'report':
                 self._render_report()
-            elif view == 'appearance':
-                self._render_appearance()
             elif view == 'import_static_data':
                 self._render_import_static_data()
             elif view == 'tracked_worlds':
@@ -245,17 +232,9 @@ class UniversusGUI:
             
             ui.button('Generate Report', icon=GameIcons.ANALYTICS, on_click=generate).props('color=primary').classes('mt-4')
     
-    def _render_appearance(self):
-        """Render appearance settings view."""
-        settings.render_appearance_settings(
-            self.theme,
-            self.toggle_theme,
-            self.theme.dark_mode
-        )
-    
     def _render_import_static_data(self):
         """Render import static data view."""
-        progress_container = settings.render_import_static_data(self.service, self.theme.dark_mode)
+        progress_container = settings.render_import_static_data(self.service)
         
         async def start_import():
             self.service.ensure_api_connection()

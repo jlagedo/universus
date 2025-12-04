@@ -1,9 +1,13 @@
 """
 Market Analysis view - Comprehensive HQ/NQ price and volume analysis.
+
+Uses the unified design system for consistent styling.
 """
 
 from nicegui import ui
 from ..utils.formatters import format_gil, format_velocity
+from ..utils.design_system import heading_classes, PROPS
+from ..components.cards import warning_card
 
 
 def render(state, service, dark_mode: bool = False):
@@ -12,19 +16,17 @@ def render(state, service, dark_mode: bool = False):
     Args:
         state: Application state
         service: Market service instance
-        dark_mode: Whether dark mode is active
+        dark_mode: Ignored (always dark mode)
     
     Returns:
         Tuple of (world_options, world_select, search_input, results_container)
     """
-    ui.label('Market Analysis').classes('text-2xl font-bold mb-4')
-    ui.label('Total volume analysis based on world min prices and daily velocity.').classes('text-gray-500 mb-4')
+    ui.label('Market Analysis').classes(heading_classes(2))
+    ui.label('Total volume analysis based on world min prices and daily velocity.').classes('text-gray-400 mb-6')
     
     tracked = service.list_tracked_worlds()
     if not tracked:
-        with ui.card().classes('w-full bg-yellow-50'):
-            ui.label('No tracked worlds configured.').classes('text-yellow-700')
-            ui.label('Add tracked worlds in Settings > Tracked Worlds first.').classes('text-sm text-yellow-600')
+        warning_card('No tracked worlds configured', 'Add tracked worlds in Settings > Tracked Worlds first.')
         return None, None, None, None
     
     world_options = {}
@@ -34,8 +36,8 @@ def render(state, service, dark_mode: bool = False):
         world_options[world_name] = world_id
     
     # Sticky filter card that stays visible when scrolling
-    with ui.card().classes('w-full max-w-2xl sticky top-0 z-10').style('position: sticky; top: 0;'):
-        ui.label('Filters').classes('text-lg font-semibold mb-2')
+    with ui.card().classes('w-full max-w-2xl p-4 sticky top-0 z-10').style('position: sticky; top: 0;'):
+        ui.label('Filters').classes('text-lg font-semibold text-white mb-4')
         
         with ui.row().classes('w-full gap-4 items-end'):
             selected_world_name = list(world_options.keys())[0] if world_options else None
@@ -43,7 +45,7 @@ def render(state, service, dark_mode: bool = False):
                 options=list(world_options.keys()),
                 value=selected_world_name,
                 label='Tracked World'
-            ).classes('w-64')
+            ).classes('w-64').props(PROPS.SELECT_OUTLINED)
             
             search_input = ui.input(
                 label='Search Item Name',
@@ -85,11 +87,11 @@ def generate_analysis(state, service, world_options, world_name, search_term, co
                 if search_term:
                     msg += f' No items matching "{search_term}".'
                 msg += ' Run "Update Current Prices" CLI command first.'
-                ui.label(msg).classes('text-yellow-600')
+                warning_card('No data available', msg)
                 return
             
             search_info = f' • Filtered by "{search_term}"' if search_term and search_term.strip() else ''
-            ui.label(f'{world_name} Market Analysis • Data from {latest_date}{search_info}').classes('text-lg font-semibold mb-2')
+            ui.label(f'{world_name} Market Analysis • Data from {latest_date}{search_info}').classes('text-lg font-semibold text-white mb-4')
             
             # Define columns for the table with tooltips
             columns = [
@@ -219,12 +221,12 @@ def generate_analysis(state, service, world_options, world_name, search_term, co
                 </q-td>
             ''')
             
-            ui.label(f'Showing {len(results)} items').classes('text-sm text-gray-500 mt-2')
+            ui.label(f'Showing {len(results)} items').classes('text-sm text-gray-400 mt-2')
         
         set_status('Ready')
         
     except Exception as e:
         with container:
-            ui.label(f'Error: {e}').classes('text-red-600')
+            ui.label(f'Error: {e}').classes('text-red-500')
         set_status('Error')
         ui.notify(f'Error: {e}', type='negative')

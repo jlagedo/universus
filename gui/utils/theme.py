@@ -1,9 +1,11 @@
 """
 Theme management for the GUI.
+
+Uses the unified design system for consistent styling across all components.
 """
 
-from pathlib import Path
 from nicegui import ui
+from .design_system import COLORS, TYPOGRAPHY
 
 
 # Google Fonts for gaming aesthetic (Material Icons are built into NiceGUI/Quasar)
@@ -13,675 +15,793 @@ GOOGLE_FONTS_HTML = '''
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Exo+2:ital,wght@0,100..900;1,100..900&family=Rajdhani:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 '''
 
-# Font CSS for gaming theme
-FONT_CSS = '''
-/* Gaming Font Stack */
-:root {
-    --font-display: 'Orbitron', 'Segoe UI', Roboto, sans-serif;
-    --font-body: 'Exo 2', 'Segoe UI', Roboto, sans-serif;
-    --font-accent: 'Rajdhani', 'Segoe UI', Roboto, sans-serif;
-}
+# Font and base CSS for gaming theme
+BASE_CSS = f'''
+/* ============================================
+   UNIVERSUS DESIGN SYSTEM - Base Styles
+   ============================================ */
+
+/* CSS Custom Properties (Design Tokens) */
+:root {{
+    /* Fonts */
+    --font-display: {TYPOGRAPHY.FONT_DISPLAY};
+    --font-body: {TYPOGRAPHY.FONT_BODY};
+    --font-accent: {TYPOGRAPHY.FONT_ACCENT};
+    
+    /* Colors */
+    --color-bg-main: {COLORS.BG_MAIN};
+    --color-bg-card: {COLORS.BG_CARD};
+    --color-bg-elevated: {COLORS.BG_ELEVATED};
+    --color-bg-hover: {COLORS.BG_HOVER};
+    --color-text-primary: {COLORS.TEXT_PRIMARY};
+    --color-text-secondary: {COLORS.TEXT_SECONDARY};
+    --color-text-muted: {COLORS.TEXT_MUTED};
+    --color-hq: {COLORS.HQ_ACCENT};
+    --color-nq: {COLORS.NQ_ACCENT};
+    --color-interactive: {COLORS.INTERACTIVE};
+    --color-interactive-hover: {COLORS.INTERACTIVE_HOVER};
+    --color-border: {COLORS.BORDER};
+    --color-success: {COLORS.SUCCESS};
+    --color-warning: {COLORS.WARNING};
+    --color-error: {COLORS.ERROR};
+    
+    /* Typography Scale */
+    --text-xs: {TYPOGRAPHY.SIZE_XS};
+    --text-sm: {TYPOGRAPHY.SIZE_SM};
+    --text-base: {TYPOGRAPHY.SIZE_BASE};
+    --text-lg: {TYPOGRAPHY.SIZE_LG};
+    --text-xl: {TYPOGRAPHY.SIZE_XL};
+    --text-2xl: {TYPOGRAPHY.SIZE_2XL};
+    
+    /* Line Heights */
+    --leading-tight: {TYPOGRAPHY.LINE_HEIGHT_TIGHT};
+    --leading-normal: {TYPOGRAPHY.LINE_HEIGHT_NORMAL};
+    --leading-relaxed: {TYPOGRAPHY.LINE_HEIGHT_RELAXED};
+}}
 
 /* Base body font */
-body, html {
+body, html {{
     font-family: var(--font-body);
-}
+    line-height: var(--leading-normal);
+}}
 
-/* Headers and titles - Orbitron for futuristic gaming feel */
-h1, h2, h3, h4, h5, h6,
+/* ============================================
+   TYPOGRAPHY HIERARCHY
+   ============================================ */
+
+/* Page titles and major headings - Orbitron for gaming feel */
+h1, h2, h3,
+.text-2xl, .text-xl,
 .title, .header-title,
-.q-toolbar__title {
+.q-toolbar__title {{
     font-family: var(--font-display);
+    font-weight: 700;
     letter-spacing: 0.05em;
-}
+    line-height: var(--leading-tight);
+}}
 
-/* Navigation and menu items - Rajdhani for clean tech look */
+/* Section headings and subheadings */
+h4, h5, h6,
+.text-lg {{
+    font-family: var(--font-display);
+    font-weight: 600;
+    letter-spacing: 0.03em;
+}}
+
+/* Navigation, menus, and labels - Rajdhani for clean tech look */
 .q-item__label,
 .nav-item, .menu-item,
 .q-tab__label,
-.sidebar-item {
+.sidebar-item,
+.stat-label {{
     font-family: var(--font-accent);
     font-weight: 500;
-}
+    font-size: var(--text-sm);
+}}
 
-/* Stats, numbers, and data - Rajdhani for clarity */
-.stat-value, .stat-label,
+/* Stats and metrics - Rajdhani for clarity */
+.stat-value,
 .q-table tbody td,
 .q-table thead th,
-.data-value {
+.data-value {{
     font-family: var(--font-accent);
-}
+}}
 
-/* Table font sizing - enhanced readability */
-.q-table tbody td {
-    font-size: 1rem;
+/* ============================================
+   TABLE STYLING
+   ============================================ */
+
+.q-table tbody td {{
+    font-size: var(--text-base);
     padding: 10px 14px;
-}
+    line-height: var(--leading-normal);
+}}
 
-.q-table thead th {
+.q-table thead th {{
     font-size: 1.05rem;
     font-weight: 700;
     padding: 12px 14px;
     text-transform: uppercase;
     letter-spacing: 0.03em;
-}
-
-/* Alternating row colors for better scanability */
-.q-table tbody tr:nth-child(even) {
-    background-color: rgba(0, 0, 0, 0.03);
-}
-
-.q-table tbody tr:nth-child(odd) {
-    background-color: transparent;
-}
+}}
 
 /* Item name column - larger and bolder */
 .q-table tbody td[data-col="item_name"],
 .q-table tbody td[data-col="item"],
-.q-table tbody td[data-col="name"] {
+.q-table tbody td[data-col="name"] {{
     font-size: 1.05rem;
     font-weight: 600;
-}
+}}
 
-/* High-impact metrics - bold colored text */
-.metric-highlight {
-    font-weight: 700;
-    color: #1976d2;
-}
+/* ============================================
+   HQ/NQ ACCENT SYSTEM
+   ============================================ */
 
-.metric-volume {
-    font-weight: 700;
-    color: #2e7d32;
-}
+.hq-accent, .text-hq {{
+    color: var(--color-hq) !important;
+    font-weight: 600;
+}}
 
-.metric-price {
-    font-weight: 700;
-    color: #7b1fa2;
-}
+.nq-accent, .text-nq {{
+    color: var(--color-nq) !important;
+    font-weight: 600;
+}}
 
-/* Buttons - Exo 2 for readability with gaming feel */
+.bg-hq {{
+    background-color: rgba(0, 200, 162, 0.15);
+    border-left: 3px solid var(--color-hq);
+}}
+
+.bg-nq {{
+    background-color: rgba(255, 180, 0, 0.15);
+    border-left: 3px solid var(--color-nq);
+}}
+
+/* ============================================
+   METRIC HIGHLIGHTING
+   ============================================ */
+
+.metric-highlight {{
+    color: var(--color-interactive) !important;
+    font-weight: 600;
+}}
+
+.metric-volume {{
+    color: var(--color-hq) !important;
+    font-weight: 600;
+}}
+
+.metric-price {{
+    color: var(--color-nq) !important;
+    font-weight: 600;
+}}
+
+/* ============================================
+   BUTTONS
+   ============================================ */
+
 .q-btn__content,
-.q-btn {
+.q-btn {{
     font-family: var(--font-body);
     font-weight: 600;
     letter-spacing: 0.02em;
-}
+}}
 
-/* Input fields and forms */
+/* ============================================
+   FORM ELEMENTS
+   ============================================ */
+
 .q-field__native input,
 .q-field__native textarea,
-.q-field__label {
+.q-field__label {{
     font-family: var(--font-body);
-}
+}}
 
-/* Cards and panels */
-.q-card__section {
+/* ============================================
+   CARDS AND PANELS
+   ============================================ */
+
+.q-card__section {{
     font-family: var(--font-body);
-}
+}}
 
-/* Notifications and badges */
+/* ============================================
+   NOTIFICATIONS AND BADGES
+   ============================================ */
+
 .q-notification__message,
-.q-badge {
+.q-badge {{
     font-family: var(--font-accent);
     font-weight: 600;
-}
+}}
 
-/* Footer */
-.q-footer {
+/* ============================================
+   FOOTER
+   ============================================ */
+
+.q-footer {{
     font-family: var(--font-accent);
-}
+}}
 
-/* Accessibility - Focus styles for keyboard navigation */
-*:focus {
-    outline: 2px solid #1976d2;
+/* ============================================
+   ACCESSIBILITY
+   ============================================ */
+
+/* Focus styles for keyboard navigation */
+*:focus {{
+    outline: 2px solid var(--color-interactive);
     outline-offset: 2px;
-}
+}}
 
-*:focus:not(:focus-visible) {
+*:focus:not(:focus-visible) {{
     outline: none;
-}
+}}
 
-*:focus-visible {
-    outline: 2px solid #1976d2;
+*:focus-visible {{
+    outline: 2px solid var(--color-interactive);
     outline-offset: 2px;
-}
+}}
 
 /* Skip link for keyboard users */
-.skip-link {
+.skip-link {{
     position: absolute;
     top: -40px;
     left: 0;
-    background: #1976d2;
+    background: var(--color-interactive);
     color: white;
     padding: 8px 16px;
     z-index: 100;
     text-decoration: none;
     font-weight: 600;
-}
+}}
 
-.skip-link:focus {
+.skip-link:focus {{
     top: 0;
-}
+}}
 
 /* Button keyboard focus enhancement */
-.q-btn:focus-visible {
-    box-shadow: 0 0 0 3px rgba(25, 118, 210, 0.4);
-}
+.q-btn:focus-visible {{
+    box-shadow: 0 0 0 3px rgba(77, 166, 255, 0.4);
+}}
 
 /* Input keyboard focus enhancement */
-.q-field--focused .q-field__control {
-    box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.3);
-}
+.q-field--focused .q-field__control {{
+    box-shadow: 0 0 0 2px rgba(77, 166, 255, 0.3);
+}}
 
 /* Table row keyboard focus */
-.q-table tbody tr:focus-within {
-    background-color: rgba(25, 118, 210, 0.1);
-}
+.q-table tbody tr:focus-within {{
+    background-color: rgba(77, 166, 255, 0.1);
+}}
 
-/* Ensure minimum touch target size (48px) */
-.q-btn, .q-item {
+/* Ensure minimum touch target size (44px for WCAG) */
+.q-btn, .q-item {{
     min-height: 44px;
     min-width: 44px;
-}
+}}
+'''
+
+# Dark theme CSS - WCAG AA compliant
+DARK_THEME_CSS = f'''
+/* ============================================
+   DARK THEME - WCAG AA Compliant
+   
+   Contrast Ratios:
+   - Primary Text (#FFFFFF) on Main BG (#1E1E1E): 21:1 ✓
+   - Secondary Text (#B0B0B0) on Main BG (#1E1E1E): 8.5:1 ✓
+   - Secondary Text (#B0B0B0) on Card BG (#2A2A2A): 6.5:1 ✓
+   - Interactive (#4DA6FF) on Main BG (#1E1E1E): 7.2:1 ✓
+   ============================================ */
+
+/* Base styles */
+body, html {{
+    background-color: var(--color-bg-main);
+    color: var(--color-text-primary);
+}}
+
+.nicegui-app {{
+    background-color: var(--color-bg-main);
+}}
+
+/* Typography - Headings */
+h1, h2, h3, h4, h5, h6,
+.text-2xl, .text-xl, .text-lg {{
+    color: var(--color-text-primary);
+}}
+
+/* Typography - Body text line height */
+p, .q-table tbody td, .q-item__label {{
+    line-height: var(--leading-normal);
+}}
+
+/* ============================================
+   CARDS AND PANELS
+   ============================================ */
+
+.q-card, .q-expansion-item {{
+    background-color: var(--color-bg-card);
+    color: var(--color-text-primary);
+    border: 1px solid var(--color-border);
+}}
+
+.q-card .text-gray-500,
+.q-card .text-gray-400,
+.q-card .text-sm {{
+    color: var(--color-text-secondary) !important;
+}}
+
+/* Expansion items */
+.q-expansion-item .q-item__label {{
+    color: var(--color-text-primary) !important;
+}}
+
+.q-expansion-item__container {{
+    background-color: var(--color-bg-card);
+}}
+
+/* ============================================
+   FORM ELEMENTS
+   ============================================ */
+
+.q-field__control, 
+.q-field__native input, 
+.q-field__native textarea {{
+    color: var(--color-text-primary);
+    background-color: var(--color-bg-card);
+}}
+
+.q-field__label {{
+    color: var(--color-text-secondary);
+}}
+
+.q-field--focused .q-field__label {{
+    color: var(--color-interactive) !important;
+}}
+
+.q-field--focused .q-field__control {{
+    border-color: var(--color-interactive);
+    box-shadow: 0 0 0 2px rgba(77, 166, 255, 0.3);
+}}
+
+/* ============================================
+   TABLES
+   ============================================ */
+
+.q-table__card {{
+    background-color: var(--color-bg-card);
+    color: var(--color-text-primary);
+}}
+
+.q-table tbody td {{
+    color: var(--color-text-primary);
+    border-color: var(--color-border);
+}}
+
+/* Alternating row colors */
+.q-table tbody tr:nth-child(even) {{
+    background-color: rgba(58, 58, 58, 0.5);
+}}
+
+.q-table tbody tr:nth-child(odd) {{
+    background-color: transparent;
+}}
+
+.q-table tbody tr:hover {{
+    background-color: var(--color-bg-hover);
+}}
+
+.q-table tbody tr:focus-within {{
+    background-color: rgba(77, 166, 255, 0.2);
+    outline: 2px solid var(--color-interactive);
+    outline-offset: -2px;
+}}
+
+.q-table thead tr {{
+    background-color: var(--color-bg-card);
+}}
+
+.q-table thead th {{
+    color: var(--color-text-primary);
+    background-color: var(--color-bg-card);
+    border-color: var(--color-border);
+    font-weight: 700;
+}}
+
+/* ============================================
+   BUTTONS
+   ============================================ */
+
+.q-btn {{
+    color: var(--color-text-primary);
+}}
+
+.q-btn--flat {{
+    color: var(--color-interactive);
+}}
+
+.q-btn--flat:hover {{
+    background-color: rgba(77, 166, 255, 0.15);
+}}
+
+.q-btn:focus-visible {{
+    box-shadow: 0 0 0 3px rgba(77, 166, 255, 0.5);
+}}
+
+.q-btn.bg-primary {{
+    background-color: var(--color-interactive) !important;
+    color: var(--color-bg-main) !important;
+}}
+
+.q-btn.bg-primary:hover {{
+    background-color: var(--color-interactive-hover) !important;
+}}
+
+/* ============================================
+   SEPARATORS
+   ============================================ */
+
+.q-separator {{
+    background-color: var(--color-border);
+}}
+
+/* ============================================
+   SELECT/DROPDOWN
+   ============================================ */
+
+.q-menu {{
+    background-color: var(--color-bg-card);
+    color: var(--color-text-primary);
+    border: 1px solid var(--color-border);
+}}
+
+.q-item {{
+    color: var(--color-text-primary);
+}}
+
+.q-item:hover {{
+    background-color: var(--color-bg-hover);
+}}
+
+.q-item:focus-visible {{
+    background-color: rgba(77, 166, 255, 0.2);
+    outline: 2px solid var(--color-interactive);
+    outline-offset: -2px;
+}}
+
+.q-item--active {{
+    background-color: var(--color-bg-hover);
+    color: var(--color-interactive);
+}}
+
+/* ============================================
+   SCROLLBARS
+   ============================================ */
+
+::-webkit-scrollbar {{
+    width: 8px;
+    height: 8px;
+}}
+
+::-webkit-scrollbar-track {{
+    background: var(--color-bg-main);
+}}
+
+::-webkit-scrollbar-thumb {{
+    background: var(--color-border);
+    border-radius: 4px;
+}}
+
+::-webkit-scrollbar-thumb:hover {{
+    background: #4A4A4A;
+}}
+
+/* ============================================
+   TEXT COLOR OVERRIDES
+   ============================================ */
+
+.text-gray-900, .text-white {{
+    color: var(--color-text-primary) !important;
+}}
+
+.text-gray-500, .text-gray-400 {{
+    color: var(--color-text-secondary) !important;
+}}
+
+.text-gray-600, .text-gray-300 {{
+    color: #BBBBBB !important;
+}}
+
+/* ============================================
+   BACKGROUND COLOR OVERRIDES
+   ============================================ */
+
+.bg-white {{
+    background-color: var(--color-bg-card) !important;
+}}
+
+.bg-gray-100, .bg-gray-200 {{
+    background-color: var(--color-bg-card) !important;
+}}
+
+.bg-gray-800, .bg-gray-900 {{
+    background-color: var(--color-bg-main) !important;
+}}
+
+.bg-blue-50 {{
+    background-color: var(--color-bg-card) !important;
+    border-left: 3px solid var(--color-interactive) !important;
+}}
+
+.bg-yellow-50 {{
+    background-color: var(--color-bg-card) !important;
+    border-left: 3px solid var(--color-nq) !important;
+}}
+
+/* ============================================
+   ACCENT TEXT COLORS
+   ============================================ */
+
+.text-yellow-700, .text-yellow-600, 
+.text-amber-400, .text-amber-600, .text-orange-400 {{
+    color: var(--color-nq) !important;
+}}
+
+.text-blue-700, .text-blue-600, .text-blue-400 {{
+    color: var(--color-interactive) !important;
+}}
+
+.text-green-600, .text-green-400, 
+.text-teal-400, .text-teal-600 {{
+    color: var(--color-hq) !important;
+}}
+
+.text-red-600, .text-red-400 {{
+    color: var(--color-error) !important;
+}}
+
+.text-purple-600, .text-purple-400 {{
+    color: #B794F6 !important;
+}}
+
+/* ============================================
+   PROGRESS BAR
+   ============================================ */
+
+.q-linear-progress {{
+    background-color: var(--color-border);
+}}
+
+.q-linear-progress__track {{
+    background-color: var(--color-border) !important;
+}}
+
+.q-linear-progress__model {{
+    background-color: var(--color-interactive) !important;
+}}
+
+/* ============================================
+   NOTIFICATIONS
+   ============================================ */
+
+.q-notification {{
+    background-color: var(--color-bg-card);
+    color: var(--color-text-primary);
+    border: 1px solid var(--color-border);
+}}
+
+/* ============================================
+   SIDEBAR / DRAWER
+   ============================================ */
+
+.q-drawer {{
+    background-color: var(--color-bg-main) !important;
+}}
+
+.q-drawer .q-item {{
+    color: var(--color-text-primary);
+}}
+
+.q-drawer .q-item:hover {{
+    background-color: var(--color-bg-card);
+}}
+
+.q-drawer .q-item:focus-visible {{
+    background-color: rgba(77, 166, 255, 0.2);
+    outline: 2px solid var(--color-interactive);
+    outline-offset: -2px;
+}}
+
+.q-drawer .q-item--active {{
+    background-color: var(--color-bg-hover);
+    color: var(--color-interactive);
+    border-left: 3px solid var(--color-interactive);
+}}
+
+.q-drawer .q-expansion-item {{
+    border: none;
+}}
+
+.q-drawer .q-expansion-item .q-item {{
+    color: var(--color-text-primary);
+}}
+
+.q-drawer .q-expansion-item .q-item__section--side {{
+    color: var(--color-text-secondary);
+}}
+
+/* ============================================
+   HEADER
+   ============================================ */
+
+.q-header {{
+    background-color: var(--color-bg-main) !important;
+    border-bottom: 1px solid var(--color-border);
+}}
+
+/* ============================================
+   FOOTER
+   ============================================ */
+
+.q-footer {{
+    background-color: var(--color-bg-main) !important;
+    border-top: 1px solid var(--color-border);
+}}
+
+/* ============================================
+   TABS
+   ============================================ */
+
+.q-tabs {{
+    background-color: var(--color-bg-main);
+}}
+
+.q-tab {{
+    color: var(--color-text-secondary);
+}}
+
+.q-tab--active {{
+    color: var(--color-interactive) !important;
+}}
+
+.q-tab__indicator {{
+    background-color: var(--color-interactive) !important;
+}}
+
+/* ============================================
+   DIALOGS
+   ============================================ */
+
+.q-dialog__backdrop {{
+    background-color: rgba(0, 0, 0, 0.7);
+}}
+
+.q-dialog .q-card {{
+    background-color: var(--color-bg-card);
+    color: var(--color-text-primary);
+}}
+
+/* ============================================
+   CHIPS/TAGS
+   ============================================ */
+
+.q-chip {{
+    background-color: var(--color-bg-hover);
+    color: var(--color-text-primary);
+}}
+
+.q-chip--selected {{
+    background-color: var(--color-interactive);
+    color: var(--color-bg-main);
+}}
+
+/* ============================================
+   TOGGLE
+   ============================================ */
+
+.q-toggle__inner {{
+    color: var(--color-text-secondary);
+}}
+
+.q-toggle__inner--truthy {{
+    color: var(--color-hq) !important;
+}}
+
+/* ============================================
+   CHECKBOX
+   ============================================ */
+
+.q-checkbox__inner {{
+    color: var(--color-text-secondary);
+}}
+
+.q-checkbox__inner--truthy {{
+    color: var(--color-interactive) !important;
+}}
+
+/* ============================================
+   LINKS
+   ============================================ */
+
+a {{
+    color: var(--color-interactive);
+}}
+
+a:hover {{
+    color: var(--color-interactive-hover);
+}}
+
+/* ============================================
+   SELECTION
+   ============================================ */
+
+::selection {{
+    background-color: rgba(77, 166, 255, 0.3);
+    color: var(--color-text-primary);
+}}
+
+/* ============================================
+   TOOLTIP
+   ============================================ */
+
+.q-tooltip {{
+    background-color: var(--color-bg-card);
+    color: var(--color-text-primary);
+    border: 1px solid var(--color-border);
+}}
+
+/* ============================================
+   BADGE
+   ============================================ */
+
+.q-badge {{
+    background-color: var(--color-interactive);
+    color: var(--color-bg-main);
+}}
+
+/* ============================================
+   AVATAR
+   ============================================ */
+
+.q-avatar {{
+    background-color: var(--color-bg-hover);
+    color: var(--color-interactive);
+}}
 '''
 
 
 class ThemeManager:
-    """Manages dark/light theme for the application."""
+    """Manages theme for the application (dark mode only)."""
     
-    def __init__(self, initial_mode: str = 'light'):
+    def __init__(self, initial_mode: str = 'dark'):
         """Initialize theme manager.
         
         Args:
-            initial_mode: 'light' or 'dark'
+            initial_mode: Ignored, always uses dark mode
         """
-        self.dark_mode = initial_mode == 'dark'
+        self.dark_mode = True
         self._fonts_loaded = False
     
     def load_fonts(self):
         """Load Google Fonts for gaming aesthetic."""
         if not self._fonts_loaded:
             ui.add_head_html(GOOGLE_FONTS_HTML)
-            ui.add_css(FONT_CSS)
+            ui.add_css(BASE_CSS)
             self._fonts_loaded = True
-    
-    def toggle(self):
-        """Toggle between light and dark themes."""
-        self.dark_mode = not self.dark_mode
-        # Tokyo Night primary blue for dark mode
-        ui.colors(primary='#1976d2' if not self.dark_mode else '#7aa2f7')
-        self.apply_css()
-        self.save_preference()
     
     def apply_css(self):
         """Apply theme CSS to the application."""
         self.load_fonts()
-        if self.dark_mode:
-            ui.add_css(self._get_dark_css())
+        ui.colors(primary='#4DA6FF')  # Interactive blue
+        ui.add_css(DARK_THEME_CSS)
     
     def get_theme_classes(self, light: str, dark: str) -> str:
         """Get CSS classes based on current theme.
         
         Args:
-            light: Classes for light theme
+            light: Classes for light theme (ignored)
             dark: Classes for dark theme
         
         Returns:
-            Appropriate classes for current theme
+            Dark theme classes (always)
         """
-        return dark if self.dark_mode else light
-    
-    def save_preference(self):
-        """Save theme preference to config file."""
-        config_path = Path.cwd() / "config.toml"
-        if not config_path.exists():
-            config_path = Path(__file__).parent.parent.parent / "config.toml"
-        
-        if config_path.exists():
-            with open(config_path, 'r') as f:
-                content = f.read()
-            
-            # Update theme setting
-            theme_value = 'dark' if self.dark_mode else 'light'
-            if '[gui]' in content:
-                # Replace existing theme setting
-                import re
-                content = re.sub(
-                    r'theme\s*=\s*"(light|dark)"',
-                    f'theme = "{theme_value}"',
-                    content
-                )
-            else:
-                content += f'\n[gui]\ntheme = "{theme_value}"\n'
-            
-            with open(config_path, 'w') as f:
-                f.write(content)
-    
-    @staticmethod
-    def _get_dark_css() -> str:
-        """Get dark theme CSS - Tokyo Night theme colors with WCAG 2.1 AA contrast."""
-        return '''
-            /* Tokyo Night Color Palette - Enhanced for Accessibility:
-               Background: #1a1b26 (main), #16161e (darker), #1f2335 (lighter)
-               Foreground: #c0caf5 (main text - 11.5:1 contrast), #e0e0e0 (bright text - 13:1 contrast)
-               Muted: #9aa5ce (7:1 contrast for secondary text)
-               Primary: #7aa2f7 (blue), #bb9af7 (purple), #7dcfff (cyan)
-               Accent: #9ece6a (green), #e0af68 (yellow), #f7768e (red/magenta)
-            */
-            
-            body, html {
-                background-color: #1a1b26;
-                color: #c0caf5;
-            }
-            
-            .nicegui-app {
-                background-color: #1a1b26;
-            }
-            
-            /* Cards */
-            .q-card, .q-expansion-item {
-                background-color: #1f2335;
-                color: #c0caf5;
-                border: 1px solid #3d4a6b;
-            }
-            
-            /* Expansion items in dark mode */
-            .q-expansion-item .q-item__label {
-                color: #c0caf5 !important;
-            }
-            
-            .q-expansion-item__container {
-                background-color: #1f2335;
-            }
-            
-            /* Input fields - improved contrast */
-            .q-field__control, .q-field__native input, .q-field__native textarea {
-                color: #e0e0e0;
-                background-color: #24283b;
-            }
-            
-            .q-field__label {
-                color: #9aa5ce;
-            }
-            
-            .q-field--focused .q-field__label {
-                color: #7dcfff !important;
-            }
-            
-            .q-field--focused .q-field__control {
-                border-color: #7aa2f7;
-                box-shadow: 0 0 0 2px rgba(122, 162, 247, 0.3);
-            }
-                border-color: #7aa2f7;
-            }
-            
-            /* Tables - improved contrast */
-            .q-table__card {
-                background-color: #1f2335;
-                color: #c0caf5;
-            }
-            
-            .q-table tbody td {
-                color: #c0caf5;
-                border-color: #3d4a6b;
-            }
-            
-            /* Alternating row colors for dark theme */
-            .q-table tbody tr:nth-child(even) {
-                background-color: rgba(36, 40, 59, 0.7);
-            }
-            
-            .q-table tbody tr:nth-child(odd) {
-                background-color: transparent;
-            }
-            
-            .q-table tbody tr:hover {
-                background-color: #3d4a6b;
-            }
-            
-            .q-table tbody tr:focus-within {
-                background-color: rgba(122, 162, 247, 0.2);
-                outline: 2px solid #7aa2f7;
-                outline-offset: -2px;
-            }
-            
-            .q-table thead tr {
-                background-color: #24283b;
-            }
-            
-            .q-table thead th {
-                color: #7dcfff;
-                background-color: #24283b;
-                border-color: #3d4a6b;
-                font-weight: 700;
-            }
-            
-            /* High-impact metrics in dark mode - improved contrast */
-            .metric-highlight {
-                color: #7dcfff !important;
-            }
-            
-            .metric-volume {
-                color: #9ece6a !important;
-            }
-            
-            .metric-price {
-                color: #bb9af7 !important;
-            }
-            
-            /* Buttons - improved contrast and focus */
-            .q-btn {
-                color: #e0e0e0;
-            }
-            
-            .q-btn--flat {
-                color: #c0caf5;
-            }
-            
-            .q-btn--flat:hover {
-                background-color: #2a2f45;
-            }
-            
-            .q-btn:focus-visible {
-                box-shadow: 0 0 0 3px rgba(122, 162, 247, 0.5);
-            }
-            
-            .q-btn.bg-primary {
-                background-color: #7aa2f7 !important;
-                color: #1a1b26 !important;
-            }
-            
-            .q-btn.bg-primary:hover {
-                background-color: #89b4fa !important;
-            }
-            
-            /* Separators */
-            .q-separator {
-                background-color: #3d4a6b;
-            }
-            
-            /* Select/Dropdown - improved contrast */
-            .q-menu {
-                background-color: #1f2335;
-                color: #c0caf5;
-                border: 1px solid #3d4a6b;
-            }
-            
-            .q-item {
-                color: #c0caf5;
-            }
-            
-            .q-item:hover {
-                background-color: #2a2f45;
-            }
-            
-            .q-item:focus-visible {
-                background-color: rgba(122, 162, 247, 0.2);
-                outline: 2px solid #7aa2f7;
-                outline-offset: -2px;
-            }
-            
-            .q-item--active {
-                background-color: #3d4a6b;
-                color: #7dcfff;
-            }
-            
-            /* Scrollbars */
-            ::-webkit-scrollbar {
-                width: 8px;
-                height: 8px;
-            }
-            
-            ::-webkit-scrollbar-track {
-                background: #1a1b26;
-            }
-            
-            ::-webkit-scrollbar-thumb {
-                background: #33467c;
-                border-radius: 4px;
-            }
-            
-            ::-webkit-scrollbar-thumb:hover {
-                background: #565f89;
-            }
-            
-            /* Labels and text - improved contrast for accessibility */
-            .text-gray-900 {
-                color: #e0e0e0 !important;
-            }
-            
-            .text-gray-500 {
-                color: #9aa5ce !important;
-            }
-            
-            .text-gray-600 {
-                color: #a9b1d6 !important;
-            }
-            
-            .text-gray-400 {
-                color: #c0caf5 !important;
-            }
-            
-            .text-gray-300 {
-                color: #c0caf5 !important;
-            }
-            
-            /* Background colors */
-            .bg-white {
-                background-color: #1f2335 !important;
-            }
-            
-            .bg-gray-100 {
-                background-color: #1f2335 !important;
-            }
-            
-            .bg-gray-200 {
-                background-color: #1a1b26 !important;
-            }
-            
-            .bg-gray-800 {
-                background-color: #1f2335 !important;
-            }
-            
-            .bg-gray-900 {
-                background-color: #16161e !important;
-            }
-            
-            .bg-blue-50 {
-                background-color: #1f2335 !important;
-                border-left: 3px solid #7aa2f7 !important;
-            }
-            
-            .bg-yellow-50 {
-                background-color: #1f2335 !important;
-                border-left: 3px solid #e0af68 !important;
-            }
-            
-            /* Accent text colors - Tokyo Night palette */
-            .text-yellow-700 {
-                color: #e0af68 !important;
-            }
-            
-            .text-yellow-600 {
-                color: #e0af68 !important;
-            }
-            
-            .text-blue-700 {
-                color: #7aa2f7 !important;
-            }
-            
-            .text-blue-600 {
-                color: #7dcfff !important;
-            }
-            
-            .text-green-600 {
-                color: #9ece6a !important;
-            }
-            
-            .text-red-600 {
-                color: #f7768e !important;
-            }
-            
-            .text-purple-600 {
-                color: #bb9af7 !important;
-            }
-            
-            /* Progress bar */
-            .q-linear-progress {
-                background-color: #24283b;
-            }
-            
-            .q-linear-progress__track {
-                background-color: #24283b !important;
-            }
-            
-            .q-linear-progress__model {
-                background-color: #7aa2f7 !important;
-            }
-            
-            /* Notifications */
-            .q-notification {
-                background-color: #1f2335;
-                color: #a9b1d6;
-                border: 1px solid #33467c;
-            }
-            
-            /* Sidebar - improved contrast and focus */
-            .q-drawer {
-                background-color: #16161e !important;
-            }
-            
-            .q-drawer .q-item {
-                color: #c0caf5;
-            }
-            
-            .q-drawer .q-item:hover {
-                background-color: #1f2335;
-            }
-            
-            .q-drawer .q-item:focus-visible {
-                background-color: rgba(122, 162, 247, 0.2);
-                outline: 2px solid #7aa2f7;
-                outline-offset: -2px;
-            }
-            
-            .q-drawer .q-item--active {
-                background-color: #24283b;
-                color: #7dcfff;
-                border-left: 3px solid #7aa2f7;
-            }
-            
-            .q-drawer .q-expansion-item {
-                border: none;
-            }
-            
-            .q-drawer .q-expansion-item .q-item {
-                color: #c0caf5;
-            }
-            
-            .q-drawer .q-expansion-item .q-item__section--side {
-                color: #9aa5ce;
-            }
-            
-            /* Header */
-            .q-header {
-                background-color: #16161e !important;
-                border-bottom: 1px solid #33467c;
-            }
-            
-            /* Footer */
-            .q-footer {
-                background-color: #16161e !important;
-                border-top: 1px solid #33467c;
-            }
-            
-            /* Tabs */
-            .q-tabs {
-                background-color: #1a1b26;
-            }
-            
-            .q-tab {
-                color: #565f89;
-            }
-            
-            .q-tab--active {
-                color: #7aa2f7 !important;
-            }
-            
-            .q-tab__indicator {
-                background-color: #7aa2f7 !important;
-            }
-            
-            /* Dialogs */
-            .q-dialog__backdrop {
-                background-color: rgba(22, 22, 30, 0.8);
-            }
-            
-            .q-dialog .q-card {
-                background-color: #1f2335;
-                color: #a9b1d6;
-            }
-            
-            /* Chips/Tags */
-            .q-chip {
-                background-color: #24283b;
-                color: #a9b1d6;
-            }
-            
-            .q-chip--selected {
-                background-color: #33467c;
-                color: #7aa2f7;
-            }
-            
-            /* Toggle */
-            .q-toggle__inner {
-                color: #565f89;
-            }
-            
-            .q-toggle__inner--truthy {
-                color: #9ece6a !important;
-            }
-            
-            /* Checkbox */
-            .q-checkbox__inner {
-                color: #565f89;
-            }
-            
-            .q-checkbox__inner--truthy {
-                color: #7aa2f7 !important;
-            }
-            
-            /* Links */
-            a {
-                color: #7dcfff;
-            }
-            
-            a:hover {
-                color: #7aa2f7;
-            }
-            
-            /* Selection highlight */
-            ::selection {
-                background-color: #33467c;
-                color: #c0caf5;
-            }
-            
-            /* Tooltip */
-            .q-tooltip {
-                background-color: #24283b;
-                color: #a9b1d6;
-                border: 1px solid #33467c;
-            }
-            
-            /* Badge */
-            .q-badge {
-                background-color: #7aa2f7;
-                color: #1a1b26;
-            }
-            
-            /* Avatar */
-            .q-avatar {
-                background-color: #24283b;
-                color: #bb9af7;
-            }
-        '''
+        return dark

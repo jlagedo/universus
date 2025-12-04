@@ -1,8 +1,12 @@
 """
 Datacenters view.
+
+Displays all available FFXIV datacenters and their worlds.
+Uses the unified design system for consistent styling.
 """
 
 from nicegui import ui
+from ..utils.design_system import heading_classes
 
 
 def render(state, service, dark_mode: bool = False):
@@ -11,13 +15,13 @@ def render(state, service, dark_mode: bool = False):
     Args:
         state: Application state
         service: Market service instance
-        dark_mode: Whether dark mode is active
+        dark_mode: Ignored (always dark mode)
     
     Returns:
         Container for dynamic content
     """
-    ui.label('FFXIV Datacenters').classes('text-2xl font-bold mb-4')
-    ui.label('List of all available datacenters and their worlds.').classes('text-gray-500 mb-4')
+    ui.label('FFXIV Datacenters').classes(heading_classes(2))
+    ui.label('List of all available datacenters and their worlds.').classes('text-gray-400 mb-6')
     
     content_container = ui.column().classes('w-full')
     
@@ -31,11 +35,15 @@ def _render_table(state, container):
     """Render the datacenters table."""
     with container:
         if not state.datacenters:
-            ui.label('No datacenters loaded.').classes('text-gray-500')
+            with ui.card().classes('w-full p-4'):
+                ui.label('No datacenters loaded.').classes('text-gray-400')
             return
         
         # Sort by region and name
-        sorted_dcs = sorted(state.datacenters, key=lambda x: (x.get('region', ''), x.get('name', '')))
+        sorted_dcs = sorted(
+            state.datacenters, 
+            key=lambda x: (x.get('region', ''), x.get('name', ''))
+        )
         
         columns = [
             {'name': 'name', 'label': 'Datacenter', 'field': 'name', 'align': 'left', 'sortable': True},
@@ -56,4 +64,4 @@ def _render_table(state, container):
         ]
         
         ui.table(columns=columns, rows=rows, row_key='name').classes('w-full')
-        ui.label(f'Total: {len(state.datacenters)} datacenters').classes('text-sm text-gray-500 mt-2')
+        ui.label(f'Total: {len(state.datacenters)} datacenters').classes('text-sm text-gray-500 mt-4')
