@@ -297,19 +297,26 @@ class UniversusGUI:
     
     def _render_market_analysis(self):
         """Render market analysis view."""
-        world_options, world_select, search_input, results_container = market_analysis.render(
-            self.state, self.service, self.theme.dark_mode
+        # Store references for the callback
+        view_refs = {'world_options': None, 'world_select': None, 'search_input': None, 'filters_dict': None, 'results_container': None}
+        
+        def generate():
+            search_term = view_refs['search_input'].value if view_refs['search_input'] else ''
+            market_analysis.generate_analysis(
+                self.state, self.service, view_refs['world_options'], view_refs['world_select'].value,
+                search_term, view_refs['filters_dict'], view_refs['results_container'], self.set_status
+            )
+        
+        world_options, world_select, search_input, filters_dict, results_container = market_analysis.render(
+            self.state, self.service, self.theme.dark_mode, on_analyze=generate
         )
         
-        if world_options and world_select and results_container:
-            def generate():
-                search_term = search_input.value if search_input else ''
-                market_analysis.generate_analysis(
-                    self.state, self.service, world_options, world_select.value,
-                    search_term, results_container, self.set_status
-                )
-            
-            ui.button('Analyze Market', icon=GameIcons.ANALYTICS, on_click=generate).props('color=primary').classes('mt-4')
+        # Store refs for the callback
+        view_refs['world_options'] = world_options
+        view_refs['world_select'] = world_select
+        view_refs['search_input'] = search_input
+        view_refs['filters_dict'] = filters_dict
+        view_refs['results_container'] = results_container
     
     async def initialize(self):
         """Initialize the GUI with data."""

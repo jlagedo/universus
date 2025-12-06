@@ -369,8 +369,32 @@ p, .q-table tbody td, .q-item__label {{
 .q-field__control, 
 .q-field__native input, 
 .q-field__native textarea {{
-    color: var(--color-text-primary);
+    color: var(--color-text-primary) !important;
     background-color: var(--color-bg-card);
+}}
+
+.q-field__input,
+.q-field__input::placeholder {{
+    color: var(--color-text-primary) !important;
+}}
+
+input[type="text"],
+input[type="number"],
+input[type="email"],
+input[type="password"],
+input[type="search"],
+textarea {{
+    color: var(--color-text-primary) !important;
+    caret-color: var(--color-text-primary) !important;
+}}
+
+input[type="text"]::placeholder,
+input[type="number"]::placeholder,
+input[type="email"]::placeholder,
+input[type="password"]::placeholder,
+input[type="search"]::placeholder,
+textarea::placeholder {{
+    color: var(--color-text-muted) !important;
 }}
 
 .q-field__label {{

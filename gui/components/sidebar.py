@@ -25,12 +25,7 @@ class Sidebar:
     def _render(self, on_view_change: Callable):
         """Render the sidebar with collapsible sections."""
         with ui.left_drawer(value=True):
-            # Navigation header
-            with ui.row().classes('w-full items-center gap-2 p-4'):
-                ui.icon('menu').classes('text-gray-400')
-                ui.label('Navigation').classes('text-lg font-bold text-white')
-            
-            with ui.column().classes('w-full gap-1 px-2'):
+            with ui.column().classes('w-full gap-1 px-2 pt-4'):
                 # Dashboard - always visible at top
                 self._nav_button(
                     'Dashboard',
