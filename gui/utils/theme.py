@@ -158,6 +158,29 @@ h4, h5, h6,
 }}
 
 /* ============================================
+   ITEM ICONS (Spritesheet-based)
+   ============================================ */
+
+.item-icon {{
+    display: inline-block;
+    vertical-align: middle;
+    flex-shrink: 0;
+    background-repeat: no-repeat;
+}}
+
+/* Item name cell with icon - flexbox layout */
+.item-cell-with-icon {{
+    display: flex !important;
+    align-items: center;
+    gap: 12px;
+}}
+
+.item-cell-with-icon .item-name {{
+    font-weight: 600;
+    font-size: 1.05rem;
+}}
+
+/* ============================================
    METRIC HIGHLIGHTING
    ============================================ */
 
@@ -779,17 +802,22 @@ class ThemeManager:
             initial_mode: Ignored, always uses dark mode
         """
         self.dark_mode = True
-        self._fonts_loaded = False
     
     def load_fonts(self):
-        """Load Google Fonts for gaming aesthetic."""
-        if not self._fonts_loaded:
-            ui.add_head_html(GOOGLE_FONTS_HTML)
-            ui.add_css(BASE_CSS)
-            self._fonts_loaded = True
+        """Load Google Fonts for gaming aesthetic.
+        
+        Note: This must be called on every page render to ensure
+        fonts and base CSS are applied after page reload.
+        """
+        ui.add_head_html(GOOGLE_FONTS_HTML)
+        ui.add_css(BASE_CSS)
     
     def apply_css(self):
-        """Apply theme CSS to the application."""
+        """Apply theme CSS to the application.
+        
+        Note: This must be called on every page render to ensure
+        dark theme CSS is applied after page reload.
+        """
         self.load_fonts()
         ui.colors(primary='#4DA6FF')  # Interactive blue
         ui.add_css(DARK_THEME_CSS)

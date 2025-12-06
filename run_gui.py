@@ -65,8 +65,11 @@ def main():
         sys.exit(1)
     
     # Import NiceGUI after dependency check
-    from nicegui import ui
+    from nicegui import ui, app
     from gui import UniversusGUI
+    
+    # Configure static file serving for item icon spritesheets
+    app.add_static_files('/static', 'static')
     
     # Initialize services
     db, api, service, config = init_services()

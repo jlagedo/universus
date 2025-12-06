@@ -398,6 +398,24 @@ class TableSlots:
         '''
     
     @staticmethod
+    def item_name_with_icon_slot(size: int = 80) -> str:
+        """Slot for item name with sprite icon.
+        
+        Requires rows to have 'item_id' and 'item_name' fields.
+        The icon style is computed dynamically based on item_id.
+        Falls back to text-only if no icon style is available.
+        
+        Args:
+            size: Icon display size in pixels (default 80)
+        """
+        return f'''
+            <q-td :props="props" class="item-cell-with-icon">
+                <div v-if="props.row.icon_style" class="item-icon" :style="props.row.icon_style"></div>
+                <span class="item-name">{{{{ props.row.item_name }}}}</span>
+            </q-td>
+        '''
+    
+    @staticmethod
     def hq_value_slot(field: str, formatted_field: Optional[str] = None) -> str:
         """Slot for HQ-styled value with zero-value handling.
         

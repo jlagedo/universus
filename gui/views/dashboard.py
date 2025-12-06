@@ -9,7 +9,7 @@ from nicegui import ui
 from ..utils.formatters import format_time_ago
 from ..utils.design_system import STYLES, heading_classes, TABLE_SLOTS
 from ..components.cards import stat_card, stat_card_hq, stat_card_nq
-from ..utils.icons import GameIcons
+from ..utils.icons import GameIcons, SpriteIcon
 
 
 def format_number(num):
@@ -108,7 +108,9 @@ def render(state, service, dark_mode: bool = False):
             rows = [
                 {
                     'rank': idx + 1,
+                    'item_id': item['item_id'],
                     'item_name': item.get('item_name') or f"Item #{item['item_id']}",
+                    'icon_style': SpriteIcon.get_icon_style(item['item_id'], size=40),
                     'hq_velocity': format_decimal(item['hq_world_daily_velocity'], 1),
                     'hq_avg_price': format_gil(item['hq_world_avg_price']),
                     'hq_volume': format_gil(item['hq_gil_volume']),
@@ -118,8 +120,8 @@ def render(state, service, dark_mode: bool = False):
             ]
             table = ui.table(columns=columns, rows=rows, row_key='rank').classes('w-full')
             
-            # Add styled slots for HQ/NQ values
-            table.add_slot('body-cell-item_name', TABLE_SLOTS.item_name_slot())
+            # Add styled slots for HQ/NQ values with icon for item name
+            table.add_slot('body-cell-item_name', TABLE_SLOTS.item_name_with_icon_slot())
             table.add_slot('body-cell-hq_velocity', '''
                 <q-td :props="props">
                     <span class="hq-accent font-semibold">{{ props.value }}</span>

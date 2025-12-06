@@ -317,11 +317,8 @@ class UniversusGUI:
     
     def build(self):
         """Build the complete GUI."""
-        # Load gaming fonts (always)
-        self.theme.load_fonts()
-        
-        if self.theme.dark_mode:
-            self.theme.apply_css()
+        # Apply dark theme CSS (always - dark mode only app)
+        self.theme.apply_css()
         
         self.create_header()
         self.create_sidebar()

@@ -6,7 +6,8 @@ Uses the unified design system for consistent styling.
 
 from nicegui import ui
 from ..utils.formatters import format_gil, format_velocity
-from ..utils.design_system import heading_classes, PROPS
+from ..utils.design_system import heading_classes, PROPS, TABLE_SLOTS
+from ..utils.icons import SpriteIcon
 from ..components.cards import warning_card
 
 
@@ -111,6 +112,7 @@ def generate_analysis(state, service, world_options, world_name, search_term, co
                     'rank': idx,
                     'item_id': item['item_id'],
                     'item_name': item['item_name'],
+                    'icon_style': SpriteIcon.get_icon_style(item['item_id'], size=40),
                     # Use raw numeric values - table will sort correctly
                     'total_volume': item['total_volume'],
                     'total_velocity': item['total_velocity'],
@@ -174,9 +176,7 @@ def generate_analysis(state, service, world_options, world_name, search_term, co
             ''')
             
             # Add slot templates to display formatted values with highlighting and zero-value warnings
-            table.add_slot('body-cell-item_name', '''
-                <q-td :props="props" class="text-weight-bold" style="font-size: 1.05rem;">{{ props.row.item_name }}</q-td>
-            ''')
+            table.add_slot('body-cell-item_name', TABLE_SLOTS.item_name_with_icon_slot())
             table.add_slot('body-cell-total_volume', '''
                 <q-td :props="props" class="metric-volume text-weight-bold">{{ props.row.total_volume_fmt }}</q-td>
             ''')

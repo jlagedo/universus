@@ -8,6 +8,7 @@ Uses the unified design system for consistent styling.
 from nicegui import ui
 from ..utils.formatters import format_velocity, format_gil, format_time_ago
 from ..utils.design_system import heading_classes, TABLE_SLOTS
+from ..utils.icons import SpriteIcon
 from ..components.cards import warning_card
 
 
@@ -64,7 +65,9 @@ def render_table(items, container):
         rows = [
             {
                 'rank': idx + 1,
+                'item_id': item.get('item_id'),
                 'item_name': item.get('item_name') or str(item.get('item_id', 'Unknown')),
+                'icon_style': SpriteIcon.get_icon_style(item.get('item_id'), size=40),
                 'sale_velocity_raw': item.get('sale_velocity') or 0,
                 'sale_velocity': format_velocity(item.get('sale_velocity')),
                 'average_price': f"{format_gil(item.get('average_price'))} gil",
@@ -91,8 +94,8 @@ def render_table(items, container):
             )
         )
         
-        # Add styled slots
-        table.add_slot('body-cell-item_name', TABLE_SLOTS.item_name_slot())
+        # Add styled slots with icon for item name
+        table.add_slot('body-cell-item_name', TABLE_SLOTS.item_name_with_icon_slot())
         table.add_slot('body-cell-sale_velocity', '''
             <q-td :props="props" :class="props.row.sale_velocity_raw == 0 ? 'text-gray-500' : 'metric-highlight text-weight-bold'">
                 <q-icon v-if="props.row.sale_velocity_raw == 0" name="warning" class="text-amber-400 q-mr-xs" size="xs">
