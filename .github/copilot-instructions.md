@@ -9,12 +9,13 @@ This document provides guidance for GitHub Copilot when working with the Univers
 ### Tech Stack
 
 - **Language**: Python 3.7+
-- **GUI Framework**: NiceGUI 1.5.13+
+- **GUI Framework**: NiceGUI 1.5.13+ (web-based with Quasar components)
 - **CLI Framework**: Click 8.0+
-- **Database**: SQLite (built-in)
-- **Testing**: pytest 7.0+ (162 tests, 2445+ lines)
-- **Terminal UI**: Rich 13.0+
+- **Database**: SQLite (built-in, thread-safe with locks)
+- **Testing**: pytest 7.0+ (162+ tests, 2445+ lines)
+- **Terminal UI**: Rich 13.0+ (formatted tables, colors, progress bars)
 - **Charts**: Plotly, PyEcharts
+- **Async Runtime**: Python asyncio with ThreadPoolExecutor for sync-to-async wrapping
 
 ---
 
@@ -509,6 +510,126 @@ response = requests.get(f"{base_url}/{world}/{item_id}")
 
 ---
 
+## Critical Integration Patterns
+
+### Async/Sync Bridge in GUI and Service
+
+The service layer provides **both** sync and async methods:
+- Sync methods (e.g., `get_market_data()`) for CLI and database operations
+- Async methods (e.g., `get_market_data_async()`) for GUI responsiveness
+
+```python
+# In service.py - ALWAYS provide both patterns
+def get_data(self, world: str) -> dict:
+    """Synchronous method."""
+    return self.api.fetch(world)
+
+async def get_data_async(self, world: str) -> dict:
+    """Async wrapper using ThreadPoolExecutor."""
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(executor, self.get_data, world)
+```
+
+**In GUI**: Always use the `_async()` version to prevent UI freezing.
+**In CLI**: Use sync methods directly (blocking is acceptable for CLI).
+
+### Configuration Access Pattern
+
+Configuration is loaded once at startup and accessed globally:
+
+```python
+from config import get_config
+
+config = get_config()
+db_path = config.get('database', 'default_path', 'market_data.db')
+timeout = config.get('api', 'timeout', 10)
+```
+
+Never create new config instances. Use the singleton pattern via `get_config()`.
+
+### State Management in GUI
+
+Application state is centralized in `AppState`:
+
+```python
+# gui/state.py - single source of truth for UI state
+class AppState:
+    selected_world: str
+    selected_datacenter: str
+    tracked_world_ids: set
+    
+# gui/app.py passes state to all views
+def render(state, service, dark_mode=False):
+    # Access and modify shared state
+    ui.label(f'World: {state.selected_world}')
+```
+
+**Rules:**
+- All UI state mutations go through AppState
+- Views are functions that receive state, not classes
+- Views call service methods for data operations
+
+### Database Thread Safety
+
+Database writes MUST be protected with locks:
+
+```python
+# In database.py
+def save_price(self, item_id: int, world: str, price: int):
+    with self._lock:  # Required for thread safety
+        cursor = self.conn.cursor()
+        cursor.execute("INSERT INTO current_prices VALUES (?)", (item_id, world, price))
+        self.conn.commit()
+```
+
+The lock is initialized in `MarketDatabase.__init__()`:
+```python
+self._lock = threading.Lock()
+```
+
+### Rate Limiter Architecture
+
+The RateLimiter class in `api_client.py` uses token bucket algorithm:
+
+```python
+class RateLimiter:
+    """Token bucket: 20 req/s sustained, 40 req/s burst."""
+    
+    def __init__(self, requests_per_second=20.0, burst_size=40):
+        self.rate = requests_per_second
+        self.burst_size = burst_size
+        self.tokens = float(burst_size)  # Start full
+    
+    def wait(self):
+        """Block if necessary to respect limit."""
+        # Refill tokens, then consume one
+```
+
+Never call API methods without going through the rate limiter. All API requests in `UniversalisAPI` methods call `self.rate_limiter.wait()`.
+
+### Shared Executor Pattern
+
+A single `ThreadPoolExecutor` is shared across the application to avoid resource waste:
+
+```python
+# In executor.py - singleton pattern
+from concurrent.futures import ThreadPoolExecutor
+from config import get_config
+
+config = get_config()
+_max_workers = config.get('api', 'executor_workers', 3)
+executor = ThreadPoolExecutor(max_workers=_max_workers)
+
+# Use throughout the codebase
+from executor import executor
+
+async def get_data_async(self) -> dict:
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(executor, self.get_data)
+```
+
+**Why:** Prevents creating multiple thread pools, which wastes resources. The executor is automatically cleaned up on application exit via `atexit` registration.
+
 ## Testing Best Practices
 
 ### Test Structure
@@ -652,21 +773,27 @@ cursor.execute("""
 
 ### Python Executable Path
 
-```bash
+**Windows:**
+```cmd
 # Use this path for all Python commands:
-/Users/jlagedo/Developer/python/universus/.venv/bin/python
+e:\dev\universus\.venv\Scripts\python.exe
 
 # Examples:
-/Users/jlagedo/Developer/python/universus/.venv/bin/python universus.py --help
-/Users/jlagedo/Developer/python/universus/.venv/bin/python -m pytest -v
-/Users/jlagedo/Developer/python/universus/.venv/bin/python run_gui.py
+e:\dev\universus\.venv\Scripts\python.exe universus.py --help
+e:\dev\universus\.venv\Scripts\python.exe -m pytest -v
+e:\dev\universus\.venv\Scripts\python.exe run_gui.py
+```
+
+**macOS/Linux:**
+```bash
+/Users/jlagedo/Developer/python/universus/.venv/bin/python
 ```
 
 ### Why Use the venv?
 
 - Ensures all project dependencies are available
 - Avoids conflicts with system Python
-- Uses the correct Python version (3.14+)
+- Uses the correct Python version (3.7+, currently 3.14+)
 - Required for pytest, NiceGUI, and other packages
 
 ---
@@ -675,6 +802,21 @@ cursor.execute("""
 
 ### Running the Application
 
+**Windows:**
+```cmd
+REM GUI
+e:\dev\universus\.venv\Scripts\python.exe run_gui.py
+
+REM CLI
+e:\dev\universus\.venv\Scripts\python.exe universus.py --help
+e:\dev\universus\.venv\Scripts\python.exe universus.py top --world Behemoth
+
+REM Tests
+e:\dev\universus\.venv\Scripts\python.exe -m pytest
+e:\dev\universus\.venv\Scripts\python.exe run_tests.py --coverage --verbose
+```
+
+**macOS/Linux:**
 ```bash
 # GUI
 /Users/jlagedo/Developer/python/universus/.venv/bin/python run_gui.py
