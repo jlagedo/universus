@@ -44,6 +44,10 @@ timeout = 30
 # Maximum retry attempts for failed requests
 max_retries = 3
 
+[saintcoinach]
+# Path to SaintCoinach item.csv export file
+item_csv_path = "E:\\dev\\SaintCoinach\\2025.10.30.0000.0000\\exd\\item.csv"
+
 [cli]
 # Default number of items to track when initializing
 default_tracking_limit = 50

@@ -140,13 +140,15 @@ def report(ctx, world, item_id, days):
 
 
 @cli.command(name='isd')
+@click.option('--csv-path', default=None, help='Path to SaintCoinach item.csv (overrides config)')
 @click.pass_context
-def import_static_data(ctx):
-    """Import static data: item names and marketable items.
+def import_static_data(ctx, csv_path):
+    """Import static data: item names, marketable items, and item details.
     
     This command fetches:
     1. Item names from FFXIV Teamcraft data dump
     2. Marketable item IDs from Universalis API
+    3. Item details from SaintCoinach CSV export
     
     Any existing data will be replaced.
     """
@@ -164,7 +166,15 @@ def import_static_data(ctx):
             marketable_count = service.sync_marketable_items()
         MarketUI.print_success(f"Synced {marketable_count:,} marketable items")
         
-        MarketUI.print_success(f"Static data import complete: {items_count:,} items, {marketable_count:,} marketable")
+        # Sync item details
+        with MarketUI.show_status("Importing item details from SaintCoinach CSV..."):
+            details_count = service.sync_item_details_from_csv(csv_path)
+        MarketUI.print_success(f"Synced {details_count:,} item details")
+        
+        MarketUI.print_success(
+            f"Static data import complete: {items_count:,} items, "
+            f"{marketable_count:,} marketable, {details_count:,} details"
+        )
     except Exception as e:
         logger.error(f"Failed to import static data: {e}")
         MarketUI.exit_with_error(f"Failed to import static data: {str(e)}")

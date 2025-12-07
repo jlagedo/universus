@@ -80,6 +80,94 @@ class MarketDatabase:
             )
         """)
         
+        # Table for item details from SaintCoinach CSV export
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS item_details (
+                item_id INTEGER PRIMARY KEY,
+                -- Basic info
+                singular TEXT,
+                adjective INTEGER,
+                plural TEXT,
+                possessive_pronoun INTEGER,
+                starts_with_vowel INTEGER,
+                pronoun INTEGER,
+                article INTEGER,
+                name TEXT,
+                description TEXT,
+                icon INTEGER,
+                -- Item properties
+                item_level INTEGER,
+                rarity INTEGER,
+                filter_group INTEGER,
+                additional_data TEXT,
+                item_ui_category INTEGER,
+                item_search_category INTEGER,
+                equip_slot_category INTEGER,
+                item_sort_category INTEGER,
+                stack_size INTEGER,
+                -- Flags
+                is_unique BOOLEAN,
+                is_untradable BOOLEAN,
+                is_indisposable BOOLEAN,
+                lot INTEGER,
+                -- Pricing
+                price_mid INTEGER,
+                price_low INTEGER,
+                can_be_hq BOOLEAN,
+                is_dyeable BOOLEAN,
+                is_crestworthy BOOLEAN,
+                -- Actions and effects
+                item_action INTEGER,
+                cast_times INTEGER,
+                cooldowns INTEGER,
+                -- Repair/glamour
+                repair_item INTEGER,
+                item_repair INTEGER,
+                item_glamour INTEGER,
+                desynth INTEGER,
+                -- Collectables
+                is_collectable BOOLEAN,
+                always_collectable BOOLEAN,
+                aetherial_reduce INTEGER,
+                -- Equipment
+                level_equip INTEGER,
+                required_pvp_rank INTEGER,
+                equip_restriction INTEGER,
+                class_job_category INTEGER,
+                grand_company INTEGER,
+                item_series INTEGER,
+                base_param_modifier INTEGER,
+                model_main INTEGER,
+                model_sub INTEGER,
+                class_job_use INTEGER,
+                -- Combat stats
+                damage_phys INTEGER,
+                damage_mag INTEGER,
+                delay_ms INTEGER,
+                block_rate INTEGER,
+                block INTEGER,
+                defense_phys INTEGER,
+                defense_mag INTEGER,
+                -- Base parameters (stored as JSON arrays)
+                base_params TEXT,
+                base_param_values TEXT,
+                -- Special bonus
+                item_special_bonus INTEGER,
+                item_special_bonus_param INTEGER,
+                base_params_special TEXT,
+                base_param_values_special TEXT,
+                -- Materia
+                materialize_type INTEGER,
+                materia_slot_count INTEGER,
+                is_advanced_melding_permitted BOOLEAN,
+                -- PvP and misc
+                is_pvp BOOLEAN,
+                sub_stat_category INTEGER,
+                is_glamourous BOOLEAN,
+                last_synced TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
         # Table for tracked worlds configuration
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS tracked_worlds (
@@ -421,7 +509,158 @@ class MarketDatabase:
             self.conn.commit()
         logger.info(f"Successfully synced {count} items")
         return count
-    
+
+    def sync_item_details(self, csv_data: List[List[str]], column_map: Dict[str, int]) -> int:
+        """Sync item details from SaintCoinach CSV export.
+        
+        Args:
+            csv_data: List of CSV rows (lists of strings) with item details
+            column_map: Dictionary mapping column names to indices
+            
+        Returns:
+            Number of items synced
+        """
+        logger.info(f"Syncing {len(csv_data)} item details to database")
+        with self._lock:
+            cursor = self.conn.cursor()
+            
+            # Clear existing item details
+            logger.debug("Clearing existing item_details table")
+            cursor.execute("DELETE FROM item_details")
+            
+            # Helper function to safely get column value
+            def get_col(row: List[str], col_name: str, default: str = '') -> str:
+                idx = column_map.get(col_name)
+                if idx is None or idx >= len(row):
+                    return default
+                return row[idx] if row[idx] else default
+            
+            def safe_int(value: str, default: int = 0) -> int:
+                try:
+                    return int(value) if value else default
+                except (ValueError, TypeError):
+                    return default
+            
+            def safe_bool(value: str) -> bool:
+                return safe_int(value, 0) != 0
+            
+            # Insert all item details
+            count = 0
+            for row in csv_data:
+                try:
+                    # Get item ID from 'key' column (index 0)
+                    item_id = safe_int(row[0] if row else '', 0)
+                    if item_id == 0:
+                        continue
+                    
+                    # Collect base params into JSON arrays
+                    base_params = [safe_int(get_col(row, f'BaseParam[{i}]')) for i in range(6)]
+                    base_param_values = [safe_int(get_col(row, f'BaseParamValue[{i}]')) for i in range(6)]
+                    base_params_special = [safe_int(get_col(row, f'BaseParam{{Special}}[{i}]')) for i in range(6)]
+                    base_param_values_special = [safe_int(get_col(row, f'BaseParamValue{{Special}}[{i}]')) for i in range(6)]
+                    
+                    # Parse all fields from CSV using column map
+                    cursor.execute("""
+                        INSERT INTO item_details (
+                            item_id, singular, adjective, plural, possessive_pronoun, starts_with_vowel,
+                            pronoun, article, name, description, icon,
+                            item_level, rarity, filter_group, additional_data, item_ui_category,
+                            item_search_category, equip_slot_category, item_sort_category, stack_size,
+                            is_unique, is_untradable, is_indisposable, lot,
+                            price_mid, price_low, can_be_hq, is_dyeable, is_crestworthy,
+                            item_action, cast_times, cooldowns,
+                            repair_item, item_repair, item_glamour, desynth,
+                            is_collectable, always_collectable, aetherial_reduce,
+                            level_equip, required_pvp_rank, equip_restriction, class_job_category,
+                            grand_company, item_series, base_param_modifier,
+                            model_main, model_sub, class_job_use,
+                            damage_phys, damage_mag, delay_ms, block_rate, block,
+                            defense_phys, defense_mag,
+                            base_params, base_param_values,
+                            item_special_bonus, item_special_bonus_param,
+                            base_params_special, base_param_values_special,
+                            materialize_type, materia_slot_count, is_advanced_melding_permitted,
+                            is_pvp, sub_stat_category, is_glamourous
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """, (
+                        item_id,
+                        get_col(row, 'Singular'),
+                        safe_int(get_col(row, 'Adjective')),
+                        get_col(row, 'Plural'),
+                        safe_int(get_col(row, 'PossessivePronoun')),
+                        safe_int(get_col(row, 'StartsWithVowel')),
+                        safe_int(get_col(row, 'Pronoun')),
+                        safe_int(get_col(row, 'Article')),
+                        get_col(row, 'Name'),
+                        get_col(row, 'Description'),
+                        safe_int(get_col(row, 'Icon')),
+                        safe_int(get_col(row, 'Level{Item}')),
+                        safe_int(get_col(row, 'Rarity')),
+                        safe_int(get_col(row, 'FilterGroup')),
+                        safe_int(get_col(row, 'AdditionalData')),
+                        safe_int(get_col(row, 'ItemUICategory')),
+                        safe_int(get_col(row, 'ItemSearchCategory')),
+                        safe_int(get_col(row, 'EquipSlotCategory')),
+                        safe_int(get_col(row, 'ItemSortCategory')),
+                        safe_int(get_col(row, 'StackSize'), 1),
+                        safe_bool(get_col(row, 'IsUnique')),
+                        safe_bool(get_col(row, 'IsUntradable')),
+                        safe_bool(get_col(row, 'IsIndisposable')),
+                        safe_int(get_col(row, 'Lot')),
+                        safe_int(get_col(row, 'Price{Mid}')),
+                        safe_int(get_col(row, 'Price{Low}')),
+                        safe_bool(get_col(row, 'CanBeHq')),
+                        safe_int(get_col(row, 'DyeCount')) > 0,  # IsDyeable based on DyeCount
+                        safe_bool(get_col(row, 'IsCrestWorthy')),
+                        safe_int(get_col(row, 'ItemAction')),
+                        safe_int(get_col(row, 'CastTime<s>')),
+                        safe_int(get_col(row, 'Cooldown<s>')),
+                        safe_int(get_col(row, 'ClassJob{Repair}')),
+                        safe_int(get_col(row, 'Item{Repair}')),
+                        safe_int(get_col(row, 'Item{Glamour}')),
+                        safe_int(get_col(row, 'Desynth')),
+                        safe_bool(get_col(row, 'IsCollectable')),
+                        safe_bool(get_col(row, 'AlwaysCollectable')),
+                        safe_int(get_col(row, 'AetherialReduce')),
+                        safe_int(get_col(row, 'Level{Equip}')),
+                        safe_int(get_col(row, 'RequiredPvpRank')),
+                        safe_int(get_col(row, 'EquipRestriction')),
+                        safe_int(get_col(row, 'ClassJobCategory')),
+                        safe_int(get_col(row, 'GrandCompany')),
+                        safe_int(get_col(row, 'ItemSeries')),
+                        safe_int(get_col(row, 'BaseParamModifier')),
+                        safe_int(get_col(row, 'Model{Main}')),
+                        safe_int(get_col(row, 'Model{Sub}')),
+                        safe_int(get_col(row, 'ClassJob{Use}')),
+                        safe_int(get_col(row, 'Damage{Phys}')),
+                        safe_int(get_col(row, 'Damage{Mag}')),
+                        safe_int(get_col(row, 'Delay<ms>')),
+                        safe_int(get_col(row, 'BlockRate')),
+                        safe_int(get_col(row, 'Block')),
+                        safe_int(get_col(row, 'Defense{Phys}')),
+                        safe_int(get_col(row, 'Defense{Mag}')),
+                        json.dumps(base_params),
+                        json.dumps(base_param_values),
+                        safe_int(get_col(row, 'ItemSpecialBonus')),
+                        safe_int(get_col(row, 'ItemSpecialBonus{Param}')),
+                        json.dumps(base_params_special),
+                        json.dumps(base_param_values_special),
+                        safe_int(get_col(row, 'MaterializeType')),
+                        safe_int(get_col(row, 'MateriaSlotCount')),
+                        safe_bool(get_col(row, 'IsAdvancedMeldingPermitted')),
+                        safe_bool(get_col(row, 'IsPvP')),
+                        safe_int(get_col(row, 'SubStatCategory')),
+                        safe_bool(get_col(row, 'IsGlamourous'))
+                    ))
+                    count += 1
+                except (ValueError, TypeError, IndexError) as e:
+                    logger.warning(f"Skipping invalid item detail row (ID: {row[0] if row else 'unknown'}): {e}")
+                    continue
+            
+            self.conn.commit()
+        logger.info(f"Successfully synced {count} item details")
+        return count
+
     def get_item_name(self, item_id: int) -> Optional[str]:
         """Get item name by ID."""
         cursor = self.conn.cursor()

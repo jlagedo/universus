@@ -359,6 +359,87 @@ class MarketService:
             self.sync_marketable_items
         )
 
+    def sync_item_details_from_csv(self, csv_path: str = None) -> int:
+        """Sync item details from SaintCoinach CSV export.
+        
+        Reads the CSV file and imports all item details into the database.
+        Any existing data will be cleared and replaced.
+        
+        SaintCoinach CSV format:
+        - Row 0: Column indices (key, 0, 1, 2, ...)
+        - Row 1: Column names (#, Singular, Name, Description, ...)
+        - Row 2: Data types (int32, str, ...)
+        - Row 3+: Actual item data
+        
+        Args:
+            csv_path: Path to the SaintCoinach item.csv file. If None, uses config value.
+            
+        Returns:
+            Number of items synced
+            
+        Raises:
+            FileNotFoundError: If CSV file doesn't exist
+            Exception: If CSV parsing or import fails
+        """
+        import csv
+        from pathlib import Path
+        
+        # Get CSV path from config if not provided
+        if csv_path is None:
+            csv_path = config.get('saintcoinach', 'item_csv_path', '')
+            if not csv_path:
+                raise ValueError("CSV path not configured. Set 'saintcoinach.item_csv_path' in config.toml")
+        
+        csv_file = Path(csv_path)
+        if not csv_file.exists():
+            raise FileNotFoundError(f"CSV file not found: {csv_path}")
+        
+        logger.info(f"Reading item details from {csv_path}")
+        
+        # Read CSV file with SaintCoinach format
+        with open(csv_file, 'r', encoding='utf-8-sig') as f:
+            reader = csv.reader(f)
+            
+            # Skip row 0 (column indices)
+            next(reader)
+            
+            # Read row 1 (column names)
+            column_names = next(reader)
+            
+            # Skip row 2 (data types)
+            next(reader)
+            
+            # Create column name to index mapping
+            column_map = {name: idx for idx, name in enumerate(column_names) if name}
+            
+            # Read all data rows
+            csv_data = list(reader)
+        
+        logger.info(f"Read {len(csv_data)} item rows from CSV with {len(column_map)} columns")
+        
+        # Sync to database
+        count = self.db.sync_item_details(csv_data, column_map)
+        logger.info(f"Item details sync complete: {count} items")
+        return count
+    
+    async def sync_item_details_from_csv_async(self, csv_path: str = None) -> int:
+        """Async version: Sync item details from SaintCoinach CSV export.
+        
+        Non-blocking version that runs in executor.
+        
+        Args:
+            csv_path: Path to the SaintCoinach item.csv file. If None, uses config value.
+            
+        Returns:
+            Number of items synced
+        """
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(
+            executor,
+            self.sync_item_details_from_csv,
+            csv_path
+        )
+
     def add_tracked_world(self, world: str = None, world_id: int = None) -> Dict:
         """Add a world to the tracked worlds configuration.
         
